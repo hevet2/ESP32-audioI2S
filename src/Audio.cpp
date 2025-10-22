@@ -192,7 +192,7 @@ Audio::Audio(uint8_t i2sPort) {
     memset(&m_i2s_chan_cfg, 0, sizeof(i2s_chan_config_t));
     m_i2s_chan_cfg.id = (i2s_port_t)m_i2s_num; // I2S_NUM_AUTO, I2S_NUM_0, I2S_NUM_1
     m_i2s_chan_cfg.role = I2S_ROLE_MASTER;     // I2S controller master role, bclk and lrc signal will be set to output
-    m_i2s_chan_cfg.dma_desc_num = 16;          // number of DMA buffer
+    m_i2s_chan_cfg.dma_desc_num = 32;          // number of DMA buffer
     m_i2s_chan_cfg.dma_frame_num = 512;        // I2S frame number in one DMA buffer.
     m_i2s_chan_cfg.auto_clear = true;          // i2s will always send zero automatically if no data to send
     m_i2s_chan_cfg.allow_pd = false;
@@ -6001,11 +6001,11 @@ void Audio::IIR_calculateCoefficients(int8_t G0, int8_t G1, int8_t G2) { // Infi
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
     if (G0 < -40) G0 = -40; // -40dB -> Vin*0.01
-    if (G0 > 6) G0 = 6;     // +6dB -> Vin*2
+    if (G0 > 16) G0 = 16;     // +6dB -> Vin*2
     if (G1 < -40) G1 = -40;
-    if (G1 > 6) G1 = 6;
+    if (G1 > 16) G1 = 16;
     if (G2 < -40) G2 = -40;
-    if (G2 > 6) G2 = 6;
+    if (G2 > 16) G2 = 16;
 
     const float FcLS = 500;    // Frequency LowShelf(Hz)
     const float FcPKEQ = 3000; // Frequency PeakEQ(Hz)
