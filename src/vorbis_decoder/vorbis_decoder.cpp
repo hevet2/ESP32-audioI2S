@@ -15,30 +15,24 @@
  * adapted for the ESP32 by schreibfaul1
  *
  *  Created on: 13.02.2023
- *  Updated on: 18.10.2025
+ *  Updated on: 26.10.2025
  */
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 //                                     O G G    I M P L.
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 #include "vorbis_decoder.h"
-#include "../psram_unique_ptr.hpp"
-#include "alloca.h"
 #include "lookup.h"
-#include <vector>
 
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 bool VorbisDecoder::init() {
-    m_vorbisSegmentTable.calloc(256 * sizeof(uint16_t), "m_vorbisSegmentTable");
-    m_lastSegmentTable.alloc(4096, "m_lastSegmentTable");
-    VORBISsetDefaults();
+    setDefaults();
+    m_ogg_items.lastSegmentTable.alloc(4096, "m_lastSegmentTable");
     m_f_isValid = true;
     return true;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 void VorbisDecoder::reset() {
     clearGlobalConfigurations();
-    if (m_lastSegmentTable.valid()) m_lastSegmentTable.reset();
-    if (m_vorbisSegmentTable.valid()) m_vorbisSegmentTable.reset();
     if (m_codebooks.valid()) m_codebooks.reset();
     if (m_floor_param.valid()) m_floor_param.reset();
     if (m_floor_type.valid()) m_floor_type.reset();
@@ -46,49 +40,41 @@ void VorbisDecoder::reset() {
     if (m_map_param.valid()) m_map_param.reset();
     if (m_mode_param.valid()) m_mode_param.reset();
     if (m_dsp_state.valid()) m_dsp_state.reset();
+    m_ogg_items.segment_table.clear();
     m_f_isValid = false;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 void VorbisDecoder::clear() {
-    bitReader_clear();
-    m_lastSegmentTable.clear();
-    m_vorbisSegmentTable.clear();
+    m_bitReader.reset();
+    m_ogg_items.reset();
+    m_ogg_items.lastSegmentTable.alloc(4096, "m_lastSegmentTable");
     m_vorbisBlockPicItem.clear();
-    m_vorbisSegmentTableSize = 0;
-    m_vorbisSegmentTableRdPtr = -1;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 bool VorbisDecoder::isValid() {
     return m_f_isValid;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void VorbisDecoder::VORBISsetDefaults() {
+void VorbisDecoder::setDefaults() {
     m_pageNr = 0;
-    m_f_vorbisNewSteamTitle = false; // streamTitle
-    m_f_vorbisNewMetadataBlockPicture = false;
-    m_f_lastSegmentTable = false;
+    m_f_newSteamTitle = false; // streamTitle
+    m_f_newMetadataBlockPicture = false;
     m_f_parseOggDone = false;
     m_f_oggFirstPage = false;
     m_f_oggContinuedPage = false;
     m_f_oggLastPage = false;
-    m_f_vorbisStr_found = false;
     m_f_comment_done = false;
     if (m_dsp_state.valid()) { vorbis_dsp_destroy(m_dsp_state); }
     m_vorbisChannels = 0;
     m_vorbisSamplerate = 0;
     m_vorbisBitRate = 0;
-    m_vorbisSegmentLength = 0;
     m_vorbisValidSamples = 0;
-    m_vorbisSegmentTableSize = 0;
     m_vorbisCurrentFilePos = 0;
     m_vorbisAudioDataStart = 0;
     m_vorbisOldMode = 0xFF;
-    m_vorbisSegmentTableRdPtr = -1;
     m_vorbisError = 0;
-    m_lastSegmentTableLen = 0;
     m_vorbisBlockPicPos = 0;
     m_vorbisBlockPicLen = 0;
-    m_vorbisBlockPicLenUntilFrameEnd = 0;
     m_commentBlockSegmentSize = 0;
     m_vorbisBlockPicItem.shrink_to_fit();
     clear();
@@ -140,14 +126,13 @@ void VorbisDecoder::clearGlobalConfigurations() { // mode, mapping, floor etc
 int32_t VorbisDecoder::decode(uint8_t* inbuf, int32_t* bytesLeft, int16_t* outbuf) {
 
     int32_t ret = 0;
-    int32_t segmentLength = 0;
     int32_t bytesLeft_begin = *bytesLeft;
+    m_ogg_items.data_ptr = inbuf; // save for bitReader underrun
 
-    if (!m_vorbisSegmentTableSize) {
-        m_vorbisSegmentTableRdPtr = -1; // back to the parking position
-        ret = VORBISparseOGG(inbuf, bytesLeft);
+    if (!m_ogg_items.segment_table.size()) {
+        ret = parse_OGG(inbuf, bytesLeft);
         m_f_parseOggDone = true;
-        if (!m_vorbisSegmentTableSize) { /* VORBIS_LOG_WARN("OggS without segments?") */
+        if (!m_ogg_items.segment_table.size()) { /* VORBIS_LOG_WARN("OggS without segments?") */
             ;
         }
         goto exit;
@@ -156,32 +141,30 @@ int32_t VorbisDecoder::decode(uint8_t* inbuf, int32_t* bytesLeft, int16_t* outbu
     // So the last segment is saved. m_lastSegmentTableLen specifies the size of the last saved segment.
     // If the next Ogg Page does not contain a 'continuedPage', the last segment is played first. However,
     // if 'continuedPage' is set, the first segment of the new page is added to the saved segment and played.
-    if (!m_lastSegmentTableLen) {
-        if (m_vorbisSegmentTableSize) {
-            m_vorbisSegmentTableRdPtr++;
-            m_vorbisSegmentTableSize--;
-            segmentLength = m_vorbisSegmentTable[m_vorbisSegmentTableRdPtr];
-        }
+
+    if (m_ogg_items.segment_table.size()) {
+        m_vorbis_segment_length = m_ogg_items.segment_table[0];
+        m_ogg_items.segment_table.pop_front();
+        VORBIS_LOG_DEBUG("continue %i", m_f_oggContinuedPage);
     }
 
     if (m_pageNr < 4)
-        if (VORBIS_specialIndexOf(inbuf, "vorbis", 10) == 1) m_pageNr++;
+        if (special_index_of(inbuf, "vorbis", 10) == 1) m_pageNr++;
 
     switch (m_pageNr) {
-        case 0:
-            ret = VORBIS_PARSE_OGG_DONE; // do nothing
-            break;
+        case 0: ret = VORBIS_PARSE_OGG_DONE; break;
         case 1:
-            ret = vorbisDecodePage1(inbuf, bytesLeft, segmentLength); // blocksize, channels, samplerates
+            m_comment.reset();
+            ret = vorbisDecodePage1(inbuf, bytesLeft, m_vorbis_segment_length); // blocksize, channels, samplerates
             break;
         case 2:
-            ret = vorbisDecodePage2(inbuf, bytesLeft, segmentLength, m_vorbisCurrentFilePos); // comments
+            ret = vorbisDecodePage2(inbuf, bytesLeft, m_vorbis_segment_length, m_vorbisCurrentFilePos); // comments
             break;
         case 3:
-            ret = vorbisDecodePage3(inbuf, bytesLeft, segmentLength); // codebooks
+            ret = vorbisDecodePage3(inbuf, bytesLeft, m_vorbis_segment_length); // codebooks
             break;
         case 4:
-            ret = vorbisDecodePage4(inbuf, bytesLeft, segmentLength, outbuf); // decode audio
+            ret = vorbisDecodePage4(inbuf, bytesLeft, m_vorbis_segment_length, outbuf); // decode audio
             break;
         default:
             VORBIS_LOG_ERROR("unknown page %s", m_pageNr);
@@ -189,14 +172,22 @@ int32_t VorbisDecoder::decode(uint8_t* inbuf, int32_t* bytesLeft, int16_t* outbu
             break;
     }
 exit:
-    if (ret >= 0) m_vorbisCurrentFilePos += bytesLeft_begin - (*bytesLeft);
+    if (m_ogg_items.bytes_consumed_from_other > 0) {
+        *bytesLeft -= m_ogg_items.bytes_consumed_from_other;
+        m_ogg_items.bytes_consumed_from_other = 0;
+    }
+    if (ret >= 0) { m_vorbisCurrentFilePos += bytesLeft_begin - (*bytesLeft); }
+    if (ret < 0) {
+        VORBIS_LOG_ERROR("ret %i", ret);
+        m_ogg_items.segment_table.clear();
+    }
     return ret;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————--------------------------------------------------------------------------------
 int32_t VorbisDecoder::vorbisDecodePage1(uint8_t* inbuf, int32_t* bytesLeft, uint32_t segmentLength) {
     int32_t ret = VORBIS_PARSE_OGG_DONE;
     clearGlobalConfigurations(); // if a new codebook is required, delete the old one
-    int32_t idx = VORBIS_specialIndexOf(inbuf, "vorbis", 10);
+    int32_t idx = special_index_of(inbuf, "vorbis", 10);
     if (idx == 1) {
         // VORBIS_LOG_INFO("first packet (identification segmentLength) %i", segmentLength);
         m_identificatonHeaderLength = segmentLength;
@@ -212,54 +203,31 @@ int32_t VorbisDecoder::vorbisDecodePage1(uint8_t* inbuf, int32_t* bytesLeft, uin
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————--------------------------------------------------------------------------------
 int32_t VorbisDecoder::vorbisDecodePage2(uint8_t* inbuf, int32_t* bytesLeft, uint32_t segmentLength, uint32_t current_file_pos) {
 
-    int32_t ret = VORBIS_PARSE_OGG_DONE;
-    int32_t idx = VORBIS_specialIndexOf(inbuf, "vorbis", 10);
-    if (m_f_comment_done) goto exit;
+    int32_t ret = 0;
+    ret = parseVorbisComment(inbuf, segmentLength, current_file_pos);
 
-    if (idx == 1) {
-        ret = parseVorbisComment(inbuf, segmentLength, current_file_pos);
-        if (ret == VORBIS_COMMENT_INVALID) ret = VORBIS_ERR;
-        if (ret == VORBIS_COMMENT_NEED_MORE) ret = VORBIS_PARSE_OGG_DONE;
-        if (ret == VORBIS_COMMENT_DONE) {
-            m_f_comment_done = true;
-            ret = VORBIS_PARSE_OGG_DONE;
-        }
+    if (ret == VORBIS_COMMENT_INVALID) {
+        VORBIS_LOG_DEBUG("VORBIS_COMMENT_INVALID");
+    } else if (ret == VORBIS_COMMENT_NEED_MORE) {
+        VORBIS_LOG_DEBUG("VORBIS_COMMENT_NEED_MORE");
+        *bytesLeft -= segmentLength;
+    } else if (ret == VORBIS_COMMENT_DONE) {
+        VORBIS_LOG_DEBUG("VORBIS_COMMENT_DONE");
+        *bytesLeft -= segmentLength;
+        VORBIS_LOG_DEBUG("bytesLeft %i", *bytesLeft);
     } else {
-        ret = parseVorbisComment(inbuf, segmentLength, current_file_pos);
-        if (ret == VORBIS_COMMENT_INVALID) ret = VORBIS_ERR;
-        if (ret == VORBIS_COMMENT_NEED_MORE) ret = VORBIS_PARSE_OGG_DONE;
-        if (ret == VORBIS_COMMENT_DONE) {
-            m_f_comment_done = true;
-            ret = VORBIS_PARSE_OGG_DONE;
-        }
+        VORBIS_LOG_DEBUG("VORBIS_UNKNOWN");
     }
-exit:
-    *bytesLeft -= segmentLength;
     return ret;
 }
-// —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————--------------------------------------------------------------------------------
+// —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 int32_t VorbisDecoder::vorbisDecodePage3(uint8_t* inbuf, int32_t* bytesLeft, uint32_t segmentLength) {
     int32_t ret = VORBIS_PARSE_OGG_DONE;
-    int32_t idx = VORBIS_specialIndexOf(inbuf, "vorbis", 10);
-    m_oggPage3Len = segmentLength;
+    int32_t idx = special_index_of(inbuf, "vorbis", 10);
     if (idx == 1) {
-        // VORBIS_LOG_INFO("third packet (setup segmentLength) %i", segmentLength);
-        m_setupHeaderLength = segmentLength;
-        bitReader_setData(inbuf, segmentLength);
+        m_oggPage3Len = segmentLength - 7;           // skip ".vorbis"
+        bitReader_setData(inbuf + 7, m_oggPage3Len); // skip also ".vorbis"
         VORBIS_LOG_DEBUG(" segmentLength %i", segmentLength);
-        if (segmentLength == 4080) {
-            // that is 16*255 bytes and thus the maximum segment size
-            // it is possible that there is another block starting with 'OggS' in which there is information
-            // about codebooks. It is possible that there is another block starting with 'OggS' in which
-            // there is information about codebooks.
-            int32_t l = continuedOggPackets(inbuf + m_oggPage3Len);
-            *bytesLeft -= l;
-            m_oggPage3Len += l;
-            m_setupHeaderLength += l;
-            bitReader_setData(inbuf, m_oggPage3Len);
-            // VORBIS_LOG_INFO("s_oggPage3Len %i", m_oggPage3Len);
-            m_pageNr++;
-        }
         ret = parseVorbisCodebook();
     } else {
         VORBIS_LOG_ERROR("no \"vorbis\" something went wrong, segmentLenght: %i", segmentLength);
@@ -271,75 +239,73 @@ int32_t VorbisDecoder::vorbisDecodePage3(uint8_t* inbuf, int32_t* bytesLeft, uin
     *bytesLeft -= segmentLength;
     return ret;
 }
-// —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————--------------------------------------------------------------------------------
+// —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 int32_t VorbisDecoder::vorbisDecodePage4(uint8_t* inbuf, int32_t* bytesLeft, uint32_t segmentLength, int16_t* outbuf) {
 
     if (m_vorbisAudioDataStart == 0) { m_vorbisAudioDataStart = m_vorbisCurrentFilePos; }
 
-    int32_t ret = 0;
-    if (m_f_parseOggDone) { // first loop after VORBISparseOGG()
-        if (m_f_oggContinuedPage) {
-            if (m_lastSegmentTableLen > 0 || segmentLength > 0) {
-                if (m_lastSegmentTableLen + segmentLength > 1024) {
-                    VORBIS_LOG_ERROR("continued page too big, %i", m_lastSegmentTableLen + segmentLength);
-                    return VORBIS_ERR;
-                }
-                memcpy(m_lastSegmentTable.get() + m_lastSegmentTableLen, inbuf, segmentLength);
-                bitReader_setData(m_lastSegmentTable.get(), m_lastSegmentTableLen + segmentLength);
-                ret = vorbis_dsp_synthesis(m_lastSegmentTable.get(), m_lastSegmentTableLen + segmentLength, outbuf);
-                uint16_t outBuffSize = 2048 * 2;
-                m_vorbisValidSamples = vorbis_dsp_pcmout(outbuf, outBuffSize);
-                m_lastSegmentTableLen = 0;
-                if (!ret && !segmentLength) ret = VORBIS_CONTINUE;
-            } else { // m_lastSegmentTableLen is 0 and segmentLength is 0
-                m_vorbisValidSamples = 0;
-                ret = VORBIS_CONTINUE;
-            }
-            m_f_oggContinuedPage = false;
-        } else { // last segment without continued Page
-            if (m_lastSegmentTableLen) {
-                bitReader_setData(m_lastSegmentTable.get(), m_lastSegmentTableLen);
-                ret = vorbis_dsp_synthesis(m_lastSegmentTable.get(), m_lastSegmentTableLen, outbuf);
-                uint16_t outBuffSize = 2048 * 2;
-                m_vorbisValidSamples = vorbis_dsp_pcmout(outbuf, outBuffSize);
-                m_lastSegmentTableLen = 0;
-                if (ret == OV_ENOTAUDIO) ret = VORBIS_CONTINUE; // if no error send continue
-            } else {
-                bitReader_setData(inbuf, segmentLength);
-                ret = vorbis_dsp_synthesis(inbuf, segmentLength, outbuf);
-                uint16_t outBuffSize = 2048 * 2;
-                m_vorbisValidSamples = vorbis_dsp_pcmout(outbuf, outBuffSize);
-                ret = 0;
-            }
-        }
-    } else { // not m_f_parseOggDone
-        if (m_vorbisSegmentTableSize || m_f_lastSegmentTable) {
-            // if(m_f_oggLastPage) VORBIS_LOG_INFO("last page");
+    int32_t  ret = 0;
+    uint16_t outBuffSize = 4608 * 2;
+
+    if (m_f_oggLastPage) {
+        if (segmentLength > 1) {
             bitReader_setData(inbuf, segmentLength);
             ret = vorbis_dsp_synthesis(inbuf, segmentLength, outbuf);
-            uint16_t outBuffSize = 2048 * 2;
             m_vorbisValidSamples = vorbis_dsp_pcmout(outbuf, outBuffSize);
-            ret = 0;
-        } else { // last segment
-            if (segmentLength) {
-                memcpy(m_lastSegmentTable.get(), inbuf, segmentLength);
-                m_lastSegmentTableLen = segmentLength;
-                m_vorbisValidSamples = 0;
-                ret = 0;
-            } else {
-                m_lastSegmentTableLen = 0;
-                m_vorbisValidSamples = 0;
-                ret = VORBIS_PARSE_OGG_DONE;
-            }
+        } else {
+            m_ogg_items.lastSegmentTableLen = 0;
+            m_vorbisValidSamples = 0;
+            ret = VORBIS_PARSE_OGG_DONE;
         }
-        m_f_oggFirstPage = false;
+        VORBIS_LOG_DEBUG("last page, sl %i", segmentLength);
+        goto exit;
     }
-    m_f_parseOggDone = false;
-    if (m_f_oggLastPage && !m_vorbisSegmentTableSize) { VORBISsetDefaults(); }
 
-    if (ret != VORBIS_CONTINUE) { // nothing to do here, is playing from lastSegmentBuff
-        *bytesLeft -= segmentLength;
+    if (m_ogg_items.segment_table.size()) {
+        if (m_f_oggContinuedPage) {
+            m_f_oggContinuedPage = false;
+            memcpy(m_ogg_items.lastSegmentTable.get() + m_ogg_items.lastSegmentTableLen, inbuf, segmentLength);
+            bitReader_setData(m_ogg_items.lastSegmentTable.get(), m_ogg_items.lastSegmentTableLen + segmentLength);
+            ret = vorbis_dsp_synthesis(m_ogg_items.lastSegmentTable.get(), m_ogg_items.lastSegmentTableLen + segmentLength, outbuf);
+            m_vorbisValidSamples = vorbis_dsp_pcmout(outbuf, outBuffSize);
+            m_ogg_items.lastSegmentTableLen = 0;
+            goto exit;
+        } else if (m_ogg_items.lastSegmentTableLen) {
+            bitReader_setData(m_ogg_items.lastSegmentTable.get(), m_ogg_items.lastSegmentTableLen);
+            ret = vorbis_dsp_synthesis(m_ogg_items.lastSegmentTable.get(), m_ogg_items.lastSegmentTableLen, outbuf);
+            m_vorbisValidSamples = vorbis_dsp_pcmout(outbuf, outBuffSize);
+
+            bitReader_setData(inbuf, segmentLength);
+            ret = vorbis_dsp_synthesis(inbuf, segmentLength, outbuf);
+            m_vorbisValidSamples += vorbis_dsp_pcmout(outbuf + (m_vorbisValidSamples * m_vorbisChannels), outBuffSize);
+            m_ogg_items.lastSegmentTableLen = false;
+            goto exit;
+        } else {
+            bitReader_setData(inbuf, segmentLength);
+            ret = vorbis_dsp_synthesis(inbuf, segmentLength, outbuf);
+            if (ret < 0) {
+                VORBIS_LOG_ERROR("segmentLength %i", segmentLength);
+                ps_ptr<uint8_t> hd;
+                hd.set_name("p4");
+                hd.copy_from(inbuf, 10);
+                hd.hex_dump(10);
+            }
+            m_vorbisValidSamples = vorbis_dsp_pcmout(outbuf, outBuffSize);
+            goto exit;
+        }
+    } else {
+        memcpy(m_ogg_items.lastSegmentTable.get(), inbuf, segmentLength);
+        m_ogg_items.lastSegmentTableLen = segmentLength;
+        m_vorbisValidSamples = 0;
+        ret = 0;
     }
+exit:
+    if (ret == OV_ENOTAUDIO) {
+        m_vorbisValidSamples = 0;
+        VORBIS_LOG_INFO("non audio package at pos %i", m_vorbisCurrentFilePos);
+        ret = 0;
+    }
+    *bytesLeft -= segmentLength;
     return ret;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -372,16 +338,16 @@ uint32_t VorbisDecoder::getAudioFileDuration() {
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 const char* VorbisDecoder::getStreamTitle() {
-    if (m_f_vorbisNewSteamTitle) {
-        m_f_vorbisNewSteamTitle = false;
+    if (m_f_newSteamTitle) {
+        m_f_newSteamTitle = false;
         return m_comment.stream_title.c_get();
     }
     return NULL;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 std::vector<uint32_t> VorbisDecoder::getMetadataBlockPicture() {
-    if (m_f_vorbisNewMetadataBlockPicture) {
-        m_f_vorbisNewMetadataBlockPicture = false;
+    if (m_f_newMetadataBlockPicture) {
+        m_f_newMetadataBlockPicture = false;
         return m_comment.pic_vec;
     }
     std::vector<uint32_t> v;
@@ -471,25 +437,27 @@ int32_t VorbisDecoder::parseVorbisFirstPacket(uint8_t* inbuf, int16_t nBytes) { 
     return VORBIS_PARSE_OGG_DONE;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-int32_t VorbisDecoder::parseVorbisComment(uint8_t* inbuf, int16_t nBytes, uint32_t current_file_pos) { // reference https://xiph.org/vorbis/doc/v-comment.html
-#define BIG_COMMENT_SIZE 1024
+int32_t VorbisDecoder::parseVorbisComment(uint8_t* inbuf, int16_t nBytes, uint32_t current_file_pos) {
+    // reference https://xiph.org/vorbis/doc/v-comment.html
+
+    constexpr uint32_t MAX_COMMENT_SIZE = 1024;
+    int32_t            available_bytes = nBytes;
 
     auto parse_comment = [&](ps_ptr<char> comment) -> void {
         int idx = comment.index_of("=");
         if (idx <= 0) return;
-
         ps_ptr<char> key = comment.substr(0, idx);
         ps_ptr<char> val = comment.substr(idx + 1);
-
         if (key.starts_with_icase("metadata_block_picture")) {
+            if (m_comment.item_vec.size() % 2 != 0) { VORBIS_LOG_ERROR("vec.size is odd: %i", m_comment.item_vec.size()); }
+            m_comment.item_vec[0] += strlen("METADATA_BLOCK_PICTURE=");
             for (int i = 0; i < m_comment.item_vec.size(); i += 2) {
                 m_comment.pic_vec.push_back(m_comment.item_vec[i]);                             // start pos
                 m_comment.pic_vec.push_back(m_comment.item_vec[i + 1] - m_comment.item_vec[i]); // len = end pos - start pos
             }
             m_comment.item_vec.clear();
-            m_f_vorbisNewMetadataBlockPicture = true;
-
-            for (int i = 0; i < m_comment.pic_vec.size(); i += 2) { VORBIS_LOG_DEBUG("Segment %i   %i - %i", i / 2, m_comment.pic_vec[i], m_comment.pic_vec[i + 1]); }
+            m_f_newMetadataBlockPicture = true;
+            // for (int i = 0; i < m_comment.pic_vec.size(); i += 2) { OPUS_LOG_INFO("Segment %i   %i - %i", i / 2, m_comment.pic_vec[i], m_comment.pic_vec[i + 1]); }
             VORBIS_LOG_DEBUG("Skipping embedded picture (%d bytes)", val.size());
             return;
         }
@@ -500,9 +468,8 @@ int32_t VorbisDecoder::parseVorbisComment(uint8_t* inbuf, int16_t nBytes, uint32
                 m_comment.stream_title.append(" - ");
                 m_comment.stream_title.append(val.c_get());
             }
-            m_f_vorbisNewSteamTitle = true;
+            audio.info(audio, Audio::evt_id3data, "Artist: %s", val.c_get());
         }
-
         if (key.starts_with_icase("title")) {
             if (!m_comment.stream_title.valid()) {
                 m_comment.stream_title.assign(val.c_get());
@@ -510,148 +477,191 @@ int32_t VorbisDecoder::parseVorbisComment(uint8_t* inbuf, int16_t nBytes, uint32
                 m_comment.stream_title.append(" - ");
                 m_comment.stream_title.append(val.c_get());
             }
-            m_f_vorbisNewSteamTitle = true;
+            audio.info(audio, Audio::evt_id3data, "Title: %s", val.c_get());
+        }
+        if (key.starts_with_icase("work")) {
+            audio.info(audio, Audio::evt_id3data, "Work: %s", val.c_get());
+        }
+        if (key.starts_with_icase("composer")) {
+            audio.info(audio, Audio::evt_id3data, "Composer: %s", val.c_get());
+        }
+        if (key.starts_with_icase("genre")) {
+            audio.info(audio, Audio::evt_id3data, "Genre: %s", val.c_get());
+        }
+        if (key.starts_with_icase("date")) {
+            audio.info(audio, Audio::evt_id3data, "Date: %s", val.c_get());
+        }
+        if (key.starts_with_icase("album")) {
+            audio.info(audio, Audio::evt_id3data, "Album: %s", val.c_get());
+        }
+        if (key.starts_with_icase("comment")) {
+            audio.info(audio, Audio::evt_id3data, "Comments: %s", val.c_get());
+        }
+        if (key.starts_with_icase("tracknumber")) {
+            audio.info(audio, Audio::evt_id3data, "Track number/Position in set: %s", val.c_get());
         }
 
+        if (m_comment.stream_title.valid()) m_f_newSteamTitle = true;
         // comment.println(); // optional output
         m_comment.item_vec.clear();
     };
 
+    auto fill_content = [&](uint8_t* buff, uint32_t len) -> void {
+        // defensive guards (avoid signed/unsigned confusion)
+        const uint32_t S_MAX = MAX_COMMENT_SIZE;
+        uint32_t       s = m_comment.comment_content.strlen(); // vorhandene länge
+        if (s >= S_MAX) {
+            // already full — nothing more to add
+            VORBIS_LOG_DEBUG("comment_content already at or above MAX_COMMENT_SIZE (%u >= %u)", s, S_MAX);
+            return;
+        }
+
+        // clamp len to something sensible (len can come from the caller, so check)
+        uint32_t available_space = S_MAX - s;
+        uint32_t to_fill = (len <= available_space) ? len : available_space;
+
+        VORBIS_LOG_DEBUG("strlen %u, incoming len %u, to_fill %u", s, len, to_fill);
+
+        // defensive: wenn to_fill == 0, nichts tun
+        if (to_fill == 0) return;
+
+        // copy/append execute safely
+        const char* src = reinterpret_cast<const char*>(buff);
+        if (s == 0) {
+            // initial copy
+            m_comment.comment_content.copy_from(src, to_fill);
+        } else {
+            // append, ensure append argument limited to to_fill
+            m_comment.comment_content.append(src, to_fill);
+        }
+    };
+
     // 🔹 1. If the previous comment block was incomplete → continue now
     if (m_comment.oob) {
-        size_t missing = m_comment.comment_expected - m_comment.save_len;
-        size_t copy = std::min<size_t>(missing, nBytes);
-
-        if (m_comment.big_comment) {
-            if (m_comment.big_comment_filled < BIG_COMMENT_SIZE) {
-                uint32_t free_space = BIG_COMMENT_SIZE - m_comment.big_comment_filled;
-                if (copy < free_space) free_space = copy;
-                memcpy(m_comment.save_oob.get() + m_comment.big_comment_filled, inbuf, free_space);
-                m_comment.big_comment_filled += free_space;
-            }
-        } else {
-            memcpy(m_comment.save_oob.get() + m_comment.save_len, inbuf, copy);
-        }
-        m_comment.save_len += copy;
-
-        if (m_comment.save_len >= m_comment.comment_expected) {
-            // comment fully assembled
-            uint32_t     comment_size = little_endian(m_comment.save_oob.get());
-            ps_ptr<char> comment_content;
-            if (comment_size > BIG_COMMENT_SIZE) comment_size = BIG_COMMENT_SIZE;
-            comment_content.copy_from((const char*)m_comment.save_oob.get() + 4, comment_size);
-
-            VORBIS_LOG_DEBUG("partial_start %i", current_file_pos);
-            m_comment.item_vec.push_back(current_file_pos);
-            m_comment.end_pos = current_file_pos + copy;
-            VORBIS_LOG_DEBUG("end %i", m_comment.end_pos);
-            m_comment.item_vec.push_back(m_comment.end_pos);
-            parse_comment(comment_content);
-            m_comment.oob = false;
-            m_comment.list_length--;
-            m_comment.pointer = copy - (missing - copy);
-
-        } else {
-            VORBIS_LOG_DEBUG("partial_start %i", current_file_pos);
-            m_comment.item_vec.push_back(current_file_pos);
-            VORBIS_LOG_DEBUG("partial_end %i", current_file_pos + nBytes);
-            m_comment.item_vec.push_back(current_file_pos + nBytes);
+        int64_t tmp_to_read = (int64_t)m_comment.comment_size - (int64_t)m_comment.save_len;
+        if (tmp_to_read < 0) tmp_to_read = 0;
+        uint32_t to_read = (uint32_t)tmp_to_read;
+        if (available_bytes <= 0) {  // clamp to available_bytes (available_bytes ist signed int)
+            // nothing to do
+            if (m_comment.list_length == 0) return VORBIS_COMMENT_DONE;
             return VORBIS_COMMENT_NEED_MORE;
         }
-    }
+        if ((uint32_t)available_bytes < to_read) to_read = (uint32_t)available_bytes;
 
+        VORBIS_LOG_DEBUG("to_read %i, available_bytes %i", to_read, available_bytes);
+        m_comment.start_pos = current_file_pos;
+        VORBIS_LOG_DEBUG("partial start %i", m_comment.start_pos);
+        m_comment.item_vec.push_back(m_comment.start_pos);
+        fill_content(inbuf, to_read);
+        m_comment.save_len += to_read;
+        m_comment.pointer = to_read;
+        available_bytes -= to_read;
+        if (m_comment.save_len == m_comment.comment_size) {
+            VORBIS_LOG_DEBUG("end %i", m_comment.start_pos + to_read);
+            m_comment.item_vec.push_back(m_comment.start_pos + to_read);
+            // m_comment.comment_content.println();
+            parse_comment(m_comment.comment_content);
+            m_comment.comment_content.reset();
+            m_comment.oob = false;
+            m_comment.list_length--;
+        } else {
+            VORBIS_LOG_DEBUG("partial end %i", m_comment.start_pos + nBytes);
+            m_comment.item_vec.push_back(m_comment.start_pos + nBytes);
+        }
+        if (m_comment.list_length == 0) return VORBIS_COMMENT_DONE;
+        if (available_bytes == 0) return VORBIS_COMMENT_NEED_MORE;
+        // fall through
+    }
     // 🔹 2. If this is the first page → read header
     bool first_call = (m_comment.pointer == 0 && m_comment.list_length == 0);
     if (first_call) {
         int32_t idx = specialIndexOf(inbuf, "vorbis", 10);
-
         if (idx != 1) return VORBIS_COMMENT_INVALID;
 
         m_comment.pointer = 7; // skip ".vorbis"
-
+        available_bytes -= 7;
         uint32_t vendorLength = little_endian(inbuf + m_comment.pointer);
         m_comment.pointer += 4 + vendorLength; // skip vendor string
-
-        if (m_comment.pointer + 4 > (uint32_t)nBytes) return VORBIS_COMMENT_NEED_MORE;
-
+        available_bytes -= 4 + vendorLength;
         m_comment.list_length = little_endian(inbuf + m_comment.pointer);
         m_comment.pointer += 4;
+        available_bytes -= 4;
         VORBIS_LOG_DEBUG("VendorLen=%u, CommentCount=%u", vendorLength, m_comment.list_length);
     }
 
     // 🔹 3. read comments
     while (m_comment.list_length > 0) {
-        if (m_comment.pointer + 4 > (uint32_t)nBytes) {
-            m_comment.oob = true;
-            break;
-        }
 
-        uint32_t comment_size = little_endian(inbuf + m_comment.pointer);
-        if (comment_size > BIG_COMMENT_SIZE) m_comment.big_comment = true;
-        m_comment.pointer += 4;
-        m_comment.start_pos = current_file_pos + m_comment.pointer;
-        m_comment.end_pos = m_comment.start_pos + comment_size;
+        // --- handle possible split 4-byte comment length ---
+        if (m_comment.partial_length > 0 || available_bytes < 4) {
+            uint8_t bytes_to_copy = std::min<uint8_t>(4 - m_comment.partial_length, available_bytes);
+            memcpy(m_comment.length_bytes + m_comment.partial_length, inbuf + (nBytes - available_bytes), bytes_to_copy);
 
-        VORBIS_LOG_DEBUG("start %i", m_comment.start_pos);
-        m_comment.item_vec.push_back(m_comment.start_pos);
+            m_comment.partial_length += bytes_to_copy;
+            available_bytes -= bytes_to_copy;
+            m_comment.pointer += bytes_to_copy;
 
-        if (m_comment.pointer + comment_size > (uint32_t)nBytes) {
-            // comment about block boundary → save for later
-            m_comment.oob = true;
-            m_comment.comment_expected = comment_size + 4;
-            m_comment.save_len = nBytes - (m_comment.pointer - 4);
+            VORBIS_LOG_DEBUG("Partial length bytes collected: %d/4", m_comment.partial_length);
 
-            if (m_comment.big_comment) { // save the first bytes only
-                m_comment.save_oob.alloc(BIG_COMMENT_SIZE);
-                uint32_t sl = m_comment.save_len;
-                if (sl > BIG_COMMENT_SIZE) sl = BIG_COMMENT_SIZE;
-                memcpy(m_comment.save_oob.get(), inbuf + m_comment.pointer - 4, sl);
-                m_comment.big_comment_filled = sl;
-            } else { // save completely
-                m_comment.save_oob.alloc(m_comment.comment_expected);
-                memcpy(m_comment.save_oob.get(), inbuf + m_comment.pointer - 4, m_comment.save_len);
+            if (m_comment.partial_length < 4) {
+                // still incomplete → need more data next call
+                return VORBIS_COMMENT_NEED_MORE;
             }
 
-            VORBIS_LOG_DEBUG("Partial comment, saved %u/%u bytes", m_comment.save_len, m_comment.comment_expected);
-            VORBIS_LOG_DEBUG("partial_end %i", m_comment.start_pos + m_comment.save_len - 4);
-            m_comment.item_vec.push_back(m_comment.start_pos + m_comment.save_len - 4);
-            break;
-        }
-        VORBIS_LOG_DEBUG("end %i", m_comment.end_pos);
-        m_comment.item_vec.push_back(m_comment.end_pos);
-
-        ps_ptr<char> comment_content;
-        if (comment_size > BIG_COMMENT_SIZE) {
-            comment_content.copy_from((const char*)inbuf + m_comment.pointer, BIG_COMMENT_SIZE);
+            // now we have all 4 bytes
+            m_comment.comment_size = little_endian(m_comment.length_bytes);
+            m_comment.partial_length = 0; // reset for next comment
+            VORBIS_LOG_DEBUG("m_comment.comment_size (assembled) %u", m_comment.comment_size);
         } else {
-            comment_content.copy_from((const char*)inbuf + m_comment.pointer, comment_size);
+            memcpy(m_comment.length_bytes, inbuf + (nBytes - available_bytes), 4);
+            m_comment.comment_size = little_endian(m_comment.length_bytes);
+            m_comment.pointer += 4;
+            available_bytes -= 4;
+            VORBIS_LOG_DEBUG("m_comment.comment_size %u", m_comment.comment_size);
         }
-        m_comment.pointer += comment_size;
 
-        parse_comment(comment_content);
-        m_comment.list_length--;
+        if (m_comment.comment_size <= available_bytes) { // can completely read
+            m_comment.start_pos = current_file_pos + m_comment.pointer;
+            VORBIS_LOG_DEBUG("start %i", m_comment.start_pos);
+            m_comment.item_vec.push_back(m_comment.start_pos);
+            fill_content(inbuf + (nBytes - available_bytes), m_comment.comment_size);
+            m_comment.end_pos = m_comment.start_pos + m_comment.comment_size;
+            VORBIS_LOG_DEBUG("end %i", m_comment.end_pos);
+            m_comment.item_vec.push_back(m_comment.end_pos);
+            m_comment.pointer += m_comment.comment_size;
+            available_bytes -= m_comment.comment_size;
+            parse_comment(m_comment.comment_content);
+            m_comment.comment_content.reset();
+            m_comment.list_length--;
+            if (m_comment.list_length == 0) return VORBIS_COMMENT_DONE;
+        }
+
+        else { // out of bounds
+            m_comment.start_pos = current_file_pos + m_comment.pointer;
+            VORBIS_LOG_DEBUG("start %i", m_comment.start_pos);
+            m_comment.item_vec.push_back(m_comment.start_pos);
+            fill_content(inbuf + (nBytes - available_bytes), available_bytes);
+            m_comment.save_len = available_bytes;
+            VORBIS_LOG_DEBUG("partial_end %i", m_comment.start_pos + m_comment.save_len);
+            m_comment.item_vec.push_back(m_comment.start_pos + m_comment.save_len);
+            m_comment.pointer = 0;
+            m_comment.oob = true;
+            return VORBIS_COMMENT_NEED_MORE;
+        }
     }
-
-    // 🔹 4. Return status
-    if (m_comment.oob) { return VORBIS_COMMENT_NEED_MORE; }
-
-    if (m_comment.list_length == 0) { return VORBIS_COMMENT_DONE; }
-
     return VORBIS_COMMENT_NEED_MORE;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 int32_t VorbisDecoder::parseVorbisCodebook() {
-
-    m_bitReader.headptr += 7;
-    m_bitReader.length = m_oggPage3Len;
 
     int32_t i;
     int32_t ret = 0;
 
     m_nrOfCodebooks = bitReader(8) + 1;
     m_codebooks.calloc_array(m_nrOfCodebooks, "m_codebooks");
-
+    VORBIS_LOG_DEBUG("nr of codebooks %i", m_nrOfCodebooks);
     for (i = 0; i < m_nrOfCodebooks; i++) {
+        VORBIS_LOG_DEBUG("codebooks %i", i);
         ret = vorbis_book_unpack(m_codebooks.get() + i);
         if (ret) VORBIS_LOG_ERROR("Vorbis codebook %i returned  a err", i);
         if (ret) goto err_out;
@@ -670,7 +680,9 @@ int32_t VorbisDecoder::parseVorbisCodebook() {
     m_nrOfFloors = bitReader(6) + 1;
     m_floor_param.calloc_array(m_nrOfFloors, "m_floor_param");
     m_floor_type.alloc(sizeof(int8_t) * m_nrOfFloors, "m_floor_type");
+    VORBIS_LOG_DEBUG("nr of floors %i", m_nrOfFloors);
     for (i = 0; i < m_nrOfFloors; i++) {
+        VORBIS_LOG_DEBUG("floors %i", i);
         m_floor_type[i] = bitReader(16);
         if (m_floor_type[i] < 0 || m_floor_type[i] >= VI_FLOORB) {
             VORBIS_LOG_ERROR("err while reading floors");
@@ -690,7 +702,9 @@ int32_t VorbisDecoder::parseVorbisCodebook() {
     /* residue backend settings */
     m_nrOfResidues = bitReader(6) + 1;
     m_residue_param.calloc_array(m_nrOfResidues, "m_residue_param");
+    VORBIS_LOG_DEBUG("nr of residues %i", m_nrOfResidues);
     for (i = 0; i < m_nrOfResidues; i++) {
+        VORBIS_LOG_DEBUG("residue %i", i);
         if (res_unpack(m_residue_param.get() + i)) {
             VORBIS_LOG_ERROR("err while unpacking residues");
             goto err_out;
@@ -740,11 +754,12 @@ err_out:
     return (OV_EBADHEADER);
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-int32_t VorbisDecoder::VORBISparseOGG(uint8_t* inbuf, int32_t* bytesLeft) {
+int32_t VorbisDecoder::parse_OGG(uint8_t* inbuf, int32_t* bytesLeft) {
     // reference https://www.xiph.org/ogg/doc/rfc3533.txt
-    int32_t ret = 0;
+    int32_t  ret = 0;
+    uint32_t ogg_lengt_total = 0;
     (void)ret;
-    int32_t idx = VORBIS_specialIndexOf(inbuf, "OggS", 8192);
+    int32_t idx = special_index_of(inbuf, "OggS", 8192);
     if (idx != 0) {
         if (m_f_oggContinuedPage) {
             VORBIS_LOG_ERROR("Vorbis decoder asynchron, 'OggS' not found");
@@ -753,8 +768,6 @@ int32_t VorbisDecoder::VORBISparseOGG(uint8_t* inbuf, int32_t* bytesLeft) {
         inbuf += idx;
         *bytesLeft -= idx;
     }
-    int16_t segmentTableWrPtr = -1;
-
     uint8_t version = *(inbuf + 4);
     (void)version;
     uint8_t headerType = *(inbuf + 5);
@@ -786,9 +799,8 @@ int32_t VorbisDecoder::VORBISparseOGG(uint8_t* inbuf, int32_t* bytesLeft) {
     uint8_t pageSegments = *(inbuf + 26); // giving the number of segment entries
     // read the segment table (contains pageSegments bytes),  1...251: Length of the frame in bytes,
     // 255: A second byte is needed.  The total length is first_byte + second byte
-    m_vorbisSegmentLength = 0;
-    segmentTableWrPtr = -1;
 
+    ogg_lengt_total = 27 + pageSegments;
     for (int32_t i = 0; i < pageSegments; i++) {
         int32_t n = *(inbuf + 27 + i);
         while (*(inbuf + 27 + i) == 255) {
@@ -796,12 +808,10 @@ int32_t VorbisDecoder::VORBISparseOGG(uint8_t* inbuf, int32_t* bytesLeft) {
             if (i == pageSegments) break;
             n += *(inbuf + 27 + i);
         }
-        segmentTableWrPtr++;
-        m_vorbisSegmentTable[segmentTableWrPtr] = n;
-        m_vorbisSegmentLength += n;
+        m_ogg_items.segment_table.push_back(n);
+        ogg_lengt_total += n;
     }
-    m_vorbisSegmentTableSize = segmentTableWrPtr + 1;
-    m_vorbisCompressionRatio = (float)(960 * 2 * pageSegments) / m_vorbisSegmentLength; // const 960 validBytes out
+    m_vorbisCompressionRatio = (float)(960 * 2 * pageSegments) / ogg_lengt_total; // const 960 validBytes out
 
     bool continuedPage = headerType & 0x01; // set: page contains data of a packet continued from the previous page
     bool firstPage = headerType & 0x02;     // set: this is the first page of a logical bitstream (bos)
@@ -816,61 +826,23 @@ int32_t VorbisDecoder::VORBISparseOGG(uint8_t* inbuf, int32_t* bytesLeft) {
 
     *bytesLeft -= headerSize;
     inbuf += headerSize;
-    //   if(m_pageNr < 4 && !continuedPage) m_pageNr++;
 
     m_f_oggFirstPage = firstPage;
     m_f_oggContinuedPage = continuedPage;
     m_f_oggLastPage = lastPage;
-    m_oggHeaderSize = headerSize;
 
-    if (firstPage) m_pageNr = 0;
+    if (firstPage) { m_pageNr = 0; }
 
     return VORBIS_PARSE_OGG_DONE; // no error
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-uint16_t VorbisDecoder::continuedOggPackets(uint8_t* inbuf) {
-
-    // skip OggS header to pageSegments
-    // VORBIS_LOG_INFO("%c%c%c%c", *(inbuf+0), *(inbuf+1), *(inbuf+2), *(inbuf+3));
-    uint16_t segmentLength = 0;
-    uint8_t  headerType = *(inbuf + 5);
-    uint8_t  pageSegments = *(inbuf + 26); // giving the number of segment entries
-
-    for (int32_t i = 0; i < pageSegments; i++) {
-        int32_t n = *(inbuf + 27 + i);
-        while (*(inbuf + 27 + i) == 255) {
-            i++;
-            if (i == pageSegments) break;
-            n += *(inbuf + 27 + i);
-        }
-        segmentLength += n;
-    }
-    uint16_t headerSize = pageSegments + 27;
-    bool     continuedPage = headerType & 0x01;
-
-    if (continuedPage) {
-
-        //  codebook data are in 2 ogg packets
-        //  codebook data must no be interrupted by oggPH (ogg page header)
-        //  therefore shift codebook data2 left (oggPH size times) whith memmove
-        //  |oggPH| codebook data 1 |oggPH| codebook data 2 |oggPH|
-        //  |oppPH| codebook data 1 + 2              |unused|occPH|
-        memmove(inbuf, inbuf + headerSize, segmentLength);
-        return segmentLength + headerSize;
-        return 0;
-    }
-
-    return 0;
-}
-// —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 int32_t VorbisDecoder::findSyncWord(uint8_t* buf, int32_t nBytes) {
     // assume we have a ogg wrapper
-    int32_t idx = VORBIS_specialIndexOf(buf, "OggS", nBytes);
+    int32_t idx = special_index_of(buf, "OggS", nBytes);
     if (idx >= 0) { // Magic Word found
                     //    VORBIS_LOG_INFO("OggS found at %i", idx);
         return idx;
     }
-    // VORBIS_LOG_INFO("find sync");
     VORBIS_LOG_ERROR("Vorbis, sync 'OggS' not found");
     return VORBIS_ERR;
 }
@@ -884,16 +856,16 @@ void VorbisDecoder::setRawBlockParams(uint8_t channels, uint32_t sampleRate, uin
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 int32_t VorbisDecoder::vorbis_book_unpack(codebook_t* s) {
-    ps_ptr<char> lengthlist;
-    uint8_t      quantvals = 0;
-    int32_t      i, j;
-    int32_t      maptype;
-    int32_t      ret = 0;
+    ps_ptr<int32_t> lengthlist;
+    uint8_t         quantvals = 0;
+    int32_t         i, j;
+    int32_t         maptype;
+    int32_t         ret = 0;
 
     /* make sure alignment is correct */
     if (bitReader(24) != 0x564342) {
-        VORBIS_LOG_ERROR("Vorbis, string \"BCV\" not found");
-        goto _eofout; // "BCV"
+        VORBIS_LOG_ERROR("Vorbis, string \"VCB\" not found"); // VorbisCodeBook
+        goto _eofout;                                         // "BCV"
     }
 
     /* first the basic parameters */
@@ -911,7 +883,7 @@ int32_t VorbisDecoder::vorbis_book_unpack(codebook_t* s) {
     switch (bitReader(1)) {
         case 0:
             /* unordered */
-            lengthlist.alloc(sizeof(char) * s->entries, "lengthlist");
+            lengthlist.alloc_array(s->entries * 2, "lengthlist");
 
             /* allocated but unused entries? */
             if (bitReader(1)) {
@@ -945,7 +917,7 @@ int32_t VorbisDecoder::vorbis_book_unpack(codebook_t* s) {
                 int32_t length = bitReader(5) + 1;
 
                 s->used_entries = s->entries;
-                lengthlist.alloc(sizeof(char) * s->entries, "lengthlist");
+                lengthlist.alloc_array(s->entries * 2, "lengthlist");
 
                 for (i = 0; i < s->entries;) {
                     int32_t num = bitReader(_ilog(s->entries - i));
@@ -999,7 +971,7 @@ int32_t VorbisDecoder::vorbis_book_unpack(codebook_t* s) {
                 if (total1 <= 4 && total1 <= total2) {
                     /* use dec_type 1: vector of packed values */
                     /* need quantized values before  */
-                    s->q_val.alloc(sizeof(uint16_t) * quantvals, "q_val");
+                    s->q_val.calloc_array(sizeof(uint16_t) * quantvals, "q_val");
                     for (i = 0; i < quantvals; i++) ((uint16_t*)s->q_val.get())[i] = bitReader(s->q_bits);
 
                     if (oggpack_eop()) { goto _eofout; }
@@ -1073,7 +1045,7 @@ _eofout:
     return VORBIS_ERR; // error
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-int32_t VorbisDecoder::VORBIS_specialIndexOf(uint8_t* base, const char* str, int32_t baselen, bool exact) {
+int32_t VorbisDecoder::special_index_of(uint8_t* base, const char* str, int32_t baselen, bool exact) {
     int32_t result = -1;                  // seek for str in buffer or in header up to baselen, not nullterninated
     if (strlen(str) > baselen) return -1; // if exact == true seekstr in buffer must have "\0" at the end
     for (int32_t i = 0; i < baselen - strlen(str); i++) {
@@ -1089,15 +1061,7 @@ int32_t VorbisDecoder::VORBIS_specialIndexOf(uint8_t* base, const char* str, int
     return result;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void VorbisDecoder::bitReader_clear() {
-    m_bitReader.data = NULL;
-    m_bitReader.headptr = NULL;
-    m_bitReader.length = 0;
-    m_bitReader.headend = 0;
-    m_bitReader.headbit = 0;
-}
-// —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void VorbisDecoder::bitReader_setData(uint8_t* buff, uint16_t buffSize) {
+void VorbisDecoder::bitReader_setData(uint8_t* buff, uint32_t buffSize) {
     m_bitReader.data = buff;
     m_bitReader.headptr = buff;
     m_bitReader.length = buffSize;
@@ -1146,23 +1110,118 @@ int32_t VorbisDecoder::bitReader_look(uint16_t nBits) {
     return ret;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-/* bits <= 32 */
 int32_t VorbisDecoder::bitReader(uint16_t nBits) {
-    int32_t ret = bitReader_look(nBits);
-    if (bitReader_adv(nBits) < 0) return -1;
-    return (ret);
+    if (!m_bitReader.headptr || nBits == 0) return 0;
+
+    uint32_t val = 0;
+    uint32_t bits_collected = 0;
+
+    while (nBits > 0) {
+
+        // Check whether the BitReader is empty (end of the current Ogg page)
+        if (m_bitReader.headptr >= m_bitReader.data + m_bitReader.length) {
+
+            // ------------------------------------------------------------
+            // 🧩 Ogg limit exceeded → read next page
+            // ------------------------------------------------------------
+            uint8_t leftover = 0;
+            uint8_t bits_left = 0;
+
+            // If in the middle of the byte: save remaining bits
+            if (m_bitReader.headbit > 0 && m_bitReader.headptr > m_bitReader.data) {
+                leftover = *(m_bitReader.headptr - 1) >> (8 - m_bitReader.headbit);
+                bits_left = m_bitReader.headbit;
+            }
+
+            // Load new Ogg page
+            int32_t  oggLen = 256;
+            int32_t  ret = parse_OGG(m_bitReader.headptr, &oggLen);
+            uint32_t header_consumed = (256 - oggLen);
+            VORBIS_LOG_DEBUG("header_consumed %i", header_consumed);
+            if (ret != VORBIS_PARSE_OGG_DONE) {
+                VORBIS_LOG_ERROR("bitReader: failed to continue across Ogg page");
+                return -1;
+            }
+
+            // Apply first segment
+            if (!m_ogg_items.segment_table.empty()) {
+                VORBIS_LOG_DEBUG("old segment %i", m_vorbis_segment_length);
+                m_vorbis_segment_length = m_ogg_items.segment_table.front();
+                m_ogg_items.segment_table.pop_front();
+                VORBIS_LOG_DEBUG("new segment %i", m_vorbis_segment_length);
+                uint32_t header_consumed = (256 - oggLen);
+                m_ogg_items.bytes_consumed_from_other = m_vorbis_segment_length + header_consumed;
+            } else {
+                VORBIS_LOG_ERROR("bitReader: empty Ogg segment table");
+                return -1;
+            }
+
+            // New page data starts behind header+lacing
+            uint8_t* newPage = m_bitReader.headptr + header_consumed;
+            bitReader_setData(newPage, m_vorbis_segment_length);
+
+            // If remaining bits exist → append to the beginning of the new page
+            if (bits_left > 0) {
+                m_bitReader.data[0] = (m_bitReader.data[0] << bits_left) | leftover;
+                m_bitReader.headbit = bits_left;
+            } else {
+                m_bitReader.headbit = 0;
+            }
+
+            m_bitReader.headptr = m_bitReader.data;
+            m_bitReader.headend = m_vorbis_segment_length;
+
+            VORBIS_LOG_INFO("BitReader: crossed Ogg boundary (bits_left=%u, new_segment=%u)", bits_left, m_vorbis_segment_length);
+            continue;
+        }
+
+        // ------------------------------------------------------------
+        // 🧩 Normal reading of bits from the current byte
+        // ------------------------------------------------------------
+        uint8_t  current_byte = *m_bitReader.headptr;
+        uint32_t bits_avail = 8 - m_bitReader.headbit;
+        uint32_t take = std::min<uint32_t>(bits_avail, nBits);
+
+        uint32_t mask = ((1u << take) - 1);
+        val |= ((current_byte >> m_bitReader.headbit) & mask) << bits_collected;
+
+        bits_collected += take;
+        nBits -= take;
+        m_bitReader.headbit += take;
+
+        // Byte vollständig gelesen?
+        if (m_bitReader.headbit >= 8) {
+            m_bitReader.headbit = 0;
+            m_bitReader.headptr++;
+            m_bitReader.headend--;
+        }
+    }
+
+    if (m_bitReader.headend <= 0) { VORBIS_LOG_WARN("bitReader nearly empty: %d bytes left", m_bitReader.headend); }
+
+    return val;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-/* limited to 32 at a time */
 int8_t VorbisDecoder::bitReader_adv(uint16_t nBits) {
-    nBits += m_bitReader.headbit;
-    m_bitReader.headbit = nBits & 7;
-    m_bitReader.headend -= (nBits >> 3);
-    m_bitReader.headptr += (nBits >> 3);
-    if (m_bitReader.headend < 1) {
+    // new bit position in the current byte
+    uint32_t newBit = m_bitReader.headbit + nBits;
+
+    // Calculate how many whole bytes we skip
+    uint32_t byteAdvance = newBit >> 3;
+
+    // Remaining bits in the current byte
+    m_bitReader.headbit = newBit & 7;
+
+    // Check if we would go past the end
+    if (byteAdvance > (uint32_t)m_bitReader.headend || (byteAdvance == (uint32_t)m_bitReader.headend && m_bitReader.headbit > 0)) {
+        VORBIS_LOG_ERROR("bitReader_adv: ran out of data (advance=%u, left=%i)", byteAdvance, m_bitReader.headend);
         return -1;
-        VORBIS_LOG_ERROR("error in bitreader");
     }
+
+    // Continue byte pointer
+    m_bitReader.headptr += byteAdvance;
+    m_bitReader.headend -= byteAdvance;
+
     return 0;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -1222,7 +1281,7 @@ int32_t VorbisDecoder::_determine_leaf_words(int32_t nodeb, int32_t leafwidth) {
     return 1;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-int32_t VorbisDecoder::_make_decode_table(codebook_t* s, char* lengthlist, uint8_t quantvals, int32_t maptype) {
+int32_t VorbisDecoder::_make_decode_table(codebook_t* s, int32_t* lengthlist, uint8_t quantvals, int32_t maptype) {
     ps_ptr<uint32_t> work;
 
     if (s->dec_nodeb == 4) {
@@ -1317,7 +1376,7 @@ int32_t VorbisDecoder::_make_decode_table(codebook_t* s, char* lengthlist, uint8
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 /* given a list of word lengths, number of used entries, and byte width of a leaf, generate the decode table */
-int32_t VorbisDecoder::_make_words(char* l, uint16_t n, uint32_t* work, uint8_t quantvals, codebook_t* b, int32_t maptype) {
+int32_t VorbisDecoder::_make_words(int32_t* l, uint16_t n, uint32_t* work, uint8_t quantvals, codebook_t* b, int32_t maptype) {
 
     int32_t  i, j, count = 0;
     uint32_t top = 0;
@@ -1454,9 +1513,8 @@ uint8_t VorbisDecoder::_book_maptype1_quantvals(codebook_t* b) {
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 int32_t VorbisDecoder::oggpack_eop() {
-    if (m_bitReader.headptr - m_bitReader.data > m_setupHeaderLength) {
-        VORBIS_LOG_INFO("s_bitReader.headptr %i, m_setupHeaderLength %i", m_bitReader.headptr, m_setupHeaderLength);
-        VORBIS_LOG_INFO("ogg package 3 overflow");
+    if (m_bitReader.headptr - m_bitReader.data > m_bitReader.length) {
+        VORBIS_LOG_INFO("s_bitReader.headptr - data %i, bitReader.length %i", m_bitReader.headptr - m_bitReader.data, m_bitReader.length);
         return -1;
     }
     return 0;
@@ -2197,7 +2255,7 @@ int32_t VorbisDecoder::decode_map(codebook_t* s, int32_t* v, int32_t point) {
 
     uint32_t entry = decode_packed_entry_number(s);
 
-    if (oggpack_eop()) return (-1);
+    // if (oggpack_eop()) {return (-1);}
 
     /* according to decode type */
     switch (s->dec_type) {

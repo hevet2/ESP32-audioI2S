@@ -5,7 +5,7 @@
     Created on: 28.10.2018                                                                                                  */
 char audioI2SVers[] = "\
     Version 3.4.3m                                                                                                                              ";
-/*  Updated on: 21.10.2025
+/*  Updated on: 26.10.2025
 
     Author: Wolle (schreibfaul1)
     Audio library for ESP32, ESP32-S3 or ESP32-P4
@@ -29,8 +29,8 @@ constexpr size_t m_frameSizeWav = 2048;
 constexpr size_t m_frameSizeMP3 = 1600 * 2;
 constexpr size_t m_frameSizeAAC = 1600 * 2;
 constexpr size_t m_frameSizeFLAC = 4096 * 6; // 24576
-constexpr size_t m_frameSizeOPUS = 2048;
-constexpr size_t m_frameSizeVORBIS = 4096 * 2;
+constexpr size_t m_frameSizeOPUS = UINT16_MAX;   // max ogg size
+constexpr size_t m_frameSizeVORBIS = UINT16_MAX; // OGG length is normally 4080 bytes, but can be reach 64KB in the metadata block
 constexpr size_t m_outbuffSize = 4608 * 2;
 constexpr size_t m_samplesBuff48KSize = m_outbuffSize * 8; // 131072KB  SRmin: 6KHz -> SRmax: 48K
 
@@ -73,12 +73,12 @@ size_t AudioBuffer::init() {
     return m_buffSize;
 }
 
-void AudioBuffer::changeMaxBlockSize(uint16_t mbs) {
+void AudioBuffer::changeMaxBlockSize(uint32_t mbs) {
     m_maxBlockSize = mbs;
     return;
 }
 
-uint16_t AudioBuffer::getMaxBlockSize() {
+uint32_t AudioBuffer::getMaxBlockSize() {
     return m_maxBlockSize;
 }
 
@@ -261,7 +261,6 @@ void Audio::initInBuff() {
         size_t size = InBuff.init();
         if (size > 0) { info(*this, evt_info, "inputBufferSize: %u bytes", size - 1); }
     }
-    InBuff.changeMaxBlockSize(1600); // default size mp3 or aac
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 esp_err_t Audio::I2Sstart() {
@@ -360,6 +359,7 @@ void Audio::setDefaults() {
     m_M4A_sampleRate = 0;
     m_opus_mode = 0;
     m_lastGranulePosition = 0;
+    m_validSamples = 0;
     m_vuLeft = m_vuRight = 0; // #835
     std::fill(std::begin(m_inputHistory), std::end(m_inputHistory), 0);
     if (m_f_reset_m3u8Codec) { m_m3u8Codec = CODEC_AAC; } // reset to default
@@ -1761,7 +1761,7 @@ int Audio::read_ID3_Header(uint8_t* data, size_t len) {
         m_controlCounter++;
 
         m_ID3Hdr.id3Size = 0;
-    //    m_ID3Hdr.totalId3Size = 0; // if we have more header, id3_1_size + id3_2_size + ....
+        //    m_ID3Hdr.totalId3Size = 0; // if we have more header, id3_1_size + id3_2_size + ....
         m_ID3Hdr.remainingHeaderBytes = 0;
         m_ID3Hdr.universal_tmp = 0;
         m_ID3Hdr.ID3version = 0;
@@ -3892,8 +3892,7 @@ void Audio::processWebStream() {
     if (m_dataMode != AUDIO_DATA) return; // guard
     uint16_t readedBytes = 0;
 
-    m_pwst.maxFrameSize = InBuff.getMaxBlockSize(); // every mp3/aac frame is not bigger
-    m_pwst.availableBytes = 0;                      // available from stream
+    m_pwst.availableBytes = 0; // available from stream
     m_pwst.f_clientIsConnected = m_client->connected();
 
     // first call, set some values to default  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -3955,7 +3954,8 @@ void Audio::processWebStream() {
         }
     }
     if (!m_decoder && InBuff.bufferFilled() > 127) {
-        if (!initializeDecoder()) return;
+        if (initializeDecoder()) m_pwst.maxFrameSize = InBuff.getMaxBlockSize();
+        else return;
     }
 
     // start audio decoding - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -5185,15 +5185,15 @@ void Audio::setDecoderItems() {
     setSampleRate(m_decoder->getSampleRate());
     setBitsPerSample(m_decoder->getBitsPerSample());
     if (m_decoder->arg1()) info(*this, evt_info, "%s", m_decoder->arg1());
-
     if (m_decoder->getAudioDataStart() > 0) { // only flac-ogg, native flac sets audioDataStart in readFlacHeader()
         m_audioDataStart = m_decoder->getAudioDataStart();
-        if (m_audioFileSize) m_audioDataSize = m_audioFileSize - m_audioDataStart;
+        info(*this, evt_info, "AudioDataStart: %i", m_audioDataStart);
+        if (m_audioFileSize && !m_audioDataSize) m_audioDataSize = m_audioFileSize - m_audioDataStart;
     }
-
     if (m_lastGranulePosition && m_audioFileSize && m_sampleRate) {
         m_audioFileDuration = (uint32_t)(m_lastGranulePosition / m_sampleRate);
         m_nominal_bitrate = (m_audioFileSize - m_audioDataStart) * 8 / m_audioFileDuration;
+        AUDIO_LOG_DEBUG("m_nominal_bitrate %i, m_lastGranulePosition %i", m_nominal_bitrate, m_lastGranulePosition);
         info(*this, evt_bitrate, "%i", m_nominal_bitrate);
         info(*this, evt_info, "Duration (s): %lu", m_audioFileDuration);
         info(*this, evt_info, "Bitrate (b/s): %lu", m_nominal_bitrate);
@@ -5208,10 +5208,9 @@ void Audio::setDecoderItems() {
         AUDIO_LOG_ERROR("Num of channels must be 1 or 2, found %i", getChannels());
         stopSong();
     }
-
+    showCodecParams();
     memset(m_filterBuff, 0, sizeof(m_filterBuff));        // Clear FilterBuffer
     IIR_calculateCoefficients(m_gain0, m_gain1, m_gain2); // must be recalculated after each samplerate change
-    showCodecParams();
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 uint32_t Audio::decodeError(int8_t res, uint8_t* data, int32_t bytesDecoded) {
@@ -5257,11 +5256,13 @@ uint32_t Audio::decodeContinue(int8_t res, uint8_t* data, int32_t bytesDecoded, 
         if (res == FlacDecoder::FLAC_DECODE_FRAMES_LOOP) return bytesDecoded;
     } // nothing to play
     if (m_codec == CODEC_OPUS) {
-        if (res == OpusDecoder::OPUS_PARSE_OGG_DONE) return bytesDecoded; // nothing to play
+        if (res == OpusDecoder::OPUS_PARSE_OGG_DONE) return bytesDecoded;
         if (res == OpusDecoder::OPUS_END) return bytesDecoded;
     } // nothing to play
     if (m_codec == CODEC_VORBIS) {
         if (res == VorbisDecoder::VORBIS_PARSE_OGG_DONE) return bytesDecoded;
+        if (res == VorbisDecoder::VORBIS_COMMENT_DONE) return bytesDecoded;
+        if (res == VorbisDecoder::VORBIS_COMMENT_NEED_MORE) return bytesDecoded;
     } // nothing to play
     return 0;
 }
@@ -5272,7 +5273,7 @@ int Audio::sendBytes(uint8_t* data, size_t len) {
     int                   bytesDecoded = 0;
     const char*           st = NULL;
     std::vector<uint32_t> vec;
-    uint16_t              bytesDecoderOut;
+    uint16_t              samples_out = 0;
     if (m_validSamples) { goto exit; } // nothing to decode, next round
 
     m_sbyt.bytesLeft = 0;
@@ -5379,19 +5380,19 @@ int Audio::sendBytes(uint8_t* data, size_t len) {
         m_sbyt.f_setDecodeParamsOnce = false;
         setDecoderItems();
     }
-    if (!m_validSamples) return bytesDecoded; // nothing to play
-
-    bytesDecoderOut = m_validSamples;
-    if (m_channels == 2) bytesDecoderOut /= 2;
-    if (m_bitsPerSample == 16) bytesDecoderOut *= 2;
-    calculateAudioTime(bytesDecoded, bytesDecoderOut);
+    samples_out = m_validSamples;
+    if (m_channels == 2) samples_out /= 2;
+    if (m_bitsPerSample == 16) samples_out *= 2;
 exit:
     m_curSample = 0;
-    if (m_validSamples) { playChunk(); }
+    if (m_validSamples) {
+        calculateAudioTime(bytesDecoded, samples_out);
+        playChunk();
+    }
     return bytesDecoded;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void Audio::calculateAudioTime(uint16_t bytesDecoderIn, uint16_t bytesDecoderOut) {
+void Audio::calculateAudioTime(uint16_t bytesDecoderIn, uint16_t samples_decoder_out) {
 
     // if(m_dataMode != AUDIO_LOCALFILE && m_streamType != ST_WEBFILE) return; //guard
 
@@ -5399,18 +5400,26 @@ void Audio::calculateAudioTime(uint16_t bytesDecoderIn, uint16_t bytesDecoderOut
 
     if (m_f_firstCurTimeCall) { // first call
         m_f_firstCurTimeCall = false;
-        memset(&m_cat, 0, sizeof(audiolib::cat_t));
-        m_cat.nominalBitRate = m_nominal_bitrate;
+        m_cat.reset();
 
         if (m_codec == CODEC_FLAC && m_decoder->getAudioFileDuration()) { // BITSTREAMINFO FLAC/OGG
             m_audioFileDuration = m_decoder->getAudioFileDuration();
             m_cat.nominalBitRate = (m_audioDataSize / m_decoder->getAudioFileDuration()) * 8;
         }
+
+        if (m_nominal_bitrate) {
+            m_cat.nominalBitRate = m_nominal_bitrate;
+            m_audioFileDuration = round(((float)m_audioDataSize * 8 / m_cat.nominalBitRate));
+            if (m_lastGranulePosition)
+                m_cat.tota_samples = m_lastGranulePosition;
+            else
+                m_cat.tota_samples = m_audioFileDuration * m_sampleRate;
+        }
     }
 
     m_cat.sumBytesIn += bytesDecoderIn;
     m_cat.deltaBytesIn += bytesDecoderIn;
-    m_cat.sumBytesOut += bytesDecoderOut;
+    m_cat.sum_samples += samples_decoder_out;
 
     if (m_cat.timeStamp + 50 < millis()) {
         uint32_t t = millis();                  // time tracking
@@ -5418,7 +5427,7 @@ void Audio::calculateAudioTime(uint16_t bytesDecoderIn, uint16_t bytesDecoderOut
         m_cat.timeStamp = t;                    //    ---"---
 
         if (m_cat.nominalBitRate) {
-            audioCurrentTime = (uint32_t)(m_cat.sumBytesIn * 8 / m_cat.nominalBitRate);
+            audioCurrentTime = (uint32_t)(m_cat.sum_samples / m_sampleRate);
         } else {
             double instBitRate = (m_cat.deltaBytesIn * 8000.0) / delta_t;
             m_cat.counter++;
@@ -5547,6 +5556,12 @@ bool Audio::setAudioFilePosition(uint32_t pos) {
         m_resumeFilePos = m_audioDataStart;
     }
     m_resumeFilePos = pos;
+
+    /*   m_cat.tota_samples             m_cat.sum_samples
+         ------------------  =  ----------------------------------
+         m_audioDataSize        m_resumeFilePos - m_audioDataStart                                                  */
+
+    m_cat.sum_samples = (float)m_cat.tota_samples * ((float)(m_resumeFilePos - m_audioDataStart) / m_audioDataSize);
     return true;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -5559,6 +5574,7 @@ bool Audio::setAudioPlayTime(uint16_t sec) {
     if (sec > getAudioFileDuration()) sec = getAudioFileDuration();
     uint32_t filepos = m_audioDataStart + (getBitRate() * sec / 8);
     m_resumeFilePos = filepos;
+    m_cat.sum_samples = (float)m_cat.tota_samples * ((float)(m_resumeFilePos - m_audioDataStart) / m_audioDataSize);
     return true;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -5583,6 +5599,7 @@ bool Audio::setTimeOffset(int sec) { // fast forward or rewind the current posit
     int32_t  pos = m_audioFilePosition - inBufferFilled();
     pos += offset;
     m_resumeFilePos = pos;
+    m_cat.sum_samples = (float)m_cat.tota_samples * ((float)(m_resumeFilePos - m_audioDataStart) / m_audioDataSize);
     return true;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -5706,14 +5723,15 @@ bool Audio::fsRange(uint32_t range) {
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 bool Audio::setSampleRate(uint32_t sampRate) {
+
     if (!sampRate) sampRate = 48000;
     if (sampRate < 8000) {
         AUDIO_LOG_WARN("Sample rate must not be smaller than 8kHz, found: %lu", sampRate);
         m_sampleRate = 8000;
     }
     m_sampleRate = sampRate;
-    m_resampleRatio = (float)m_sampleRate / 48000.0f;
 
+    m_resampleRatio = (float)m_sampleRate / 48000.0f;
     m_i2s_std_cfg.clk_cfg.sample_rate_hz = m_sampleRate;
     i2s_channel_disable(m_i2s_tx_handle);
     i2s_channel_reconfig_std_clock(m_i2s_tx_handle, &m_i2s_std_cfg.clk_cfg);
