@@ -166,6 +166,11 @@ class ps_ptr {
             static_assert(!std::is_same_v<T, T>, "Copy constructor disabled for this type");
         }
     }
+
+    // 🆕 alloc constructor, e.g. ps_ptr<char>buff(1024)
+    explicit ps_ptr(size_t n) {
+        alloc(n);
+    }
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // 📌📌📌  A L L O C  📌📌📌
 
@@ -534,6 +539,48 @@ class ps_ptr {
         alloc(bytes);
         std::memcpy(mem.get(), out.data(), bytes);
         return i;
+    }
+    // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+    // 📌📌📌  U R L D E C O D E  📌📌📌
+    // Decodes the current string in-place from URL encoding.
+    // Example:
+    //   ps_ptr<char> url = "%D0%B8%D1%81%D0%BF%D1%8B%D1%82%D0%B0%D0%BD%D0%B8%D0%B5.mp3";
+    //   url.urldecode(); // → "испытание.mp3"
+    //   url = "Born%20On%20The%20B.mp3"; url.urldecode(); // → "Born On The B.mp3"
+    //   url = "A+Test.mp3"; url.urldecode(); // → "A Test.mp3"
+
+    void urldecode() {
+        static_assert(std::is_same_v<T, char>, "urldecode() is only valid for ps_ptr<char>");
+        if (!mem || !get()) {
+            log_e("urldecode: No valid string data");
+            return;
+        }
+
+        char*    str = get();
+        uint16_t p1 = 0, p2 = 0;
+        char     a, b;
+
+        while (str[p1]) {
+            if ((str[p1] == '%') && ((a = str[p1 + 1]) && (b = str[p1 + 2])) && (isxdigit(a) && isxdigit(b))) {
+
+                // Normalize lowercase to uppercase
+                if (a >= 'a') a -= ('a' - 'A');
+                if (b >= 'a') b -= ('a' - 'A');
+
+                // Convert hex digits to numeric
+                a = (a >= 'A') ? (a - 'A' + 10) : (a - '0');
+                b = (b >= 'A') ? (b - 'A' + 10) : (b - '0');
+
+                str[p2++] = (a << 4) | b;
+                p1 += 3;
+            } else if (str[p1] == '+') {
+                str[p2++] = ' ';
+                p1++;
+            } else {
+                str[p2++] = str[p1++];
+            }
+        }
+        str[p2] = '\0';
     }
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // 📌📌📌  C L O N E _ F R O M  📌📌📌
