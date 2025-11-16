@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <span>
 #include <type_traits>
 #include <utility>
 
@@ -83,6 +84,7 @@ class ps_ptr {
     size_t                             allocated_size = 0;
     char*                              name = nullptr; // member for object name
     static inline T                    dummy{};        // For invalid accesses
+    size_t                             length_ = 0;    // actual number of characters
   public:
     // Auxiliary function for setting the name
     void set_name(const char* new_name) {
@@ -724,6 +726,59 @@ class ps_ptr {
         allocated_size = new_len;
     }
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+    // 📌📌📌  P U S H _ B A C K   📌📌📌
+    // append individual characters
+    // ps_ptr<char>s; s = "abc"; s.push_back('1); -> abc1
+
+    void push_back(char c) {
+        if (length + 1 >= capacity()) {
+            // Wenn zu klein, Kapazität verdoppeln (wie std::string)
+            size_t new_cap = (capacity() == 0) ? 16 : capacity() * 2;
+            reserve(new_cap);
+        }
+
+        mem.get()[length++] = c;
+        mem.get()[length] = '\0';
+    }
+    // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+    // 📌📌📌  L E N G T H   📌📌📌
+    size_t length() const { return length_; }
+    // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+    // 📌📌📌  C A P A C I T Y   📌📌📌
+    size_t capacity() const { return allocated_size ? allocated_size - 1 : 0; }
+    // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+    // 📌📌📌  R E S E R V E  📌📌📌
+    void reserve(size_t new_cap) {
+        if (new_cap + 1 <= allocated_size) return; // genug Platz vorhanden
+
+        char*  old_data = mem.release();
+        size_t old_len = length();
+
+        size_t new_size = new_cap + 1; // +1 für '\0'
+        if (psramFound())
+            mem.reset(static_cast<char*>(ps_malloc(new_size)));
+        else
+            mem.reset(static_cast<char*>(malloc(new_size)));
+
+        if (!mem) {
+            printf("OOM: reserve(%zu) failed\n", new_size);
+            if (old_data) free(old_data);
+            return;
+        }
+
+        if (old_data) {
+            if (old_len > 0)
+                std::memcpy(mem.get(), old_data, old_len + 1);
+            else
+                mem.get()[0] = '\0';
+            free(old_data);
+        } else {
+            mem.get()[0] = '\0';
+        }
+
+        allocated_size = new_size;
+    }
+    // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // 📌📌📌  S T A R T S _ W I T H   📌📌📌
 
     // ps_ptr<char> s;
@@ -1221,19 +1276,36 @@ class ps_ptr {
     // int last = str.last_index_of('/');            // → 32 (the last '/')
     // int prev = str.last_index_of('/', last - 1);  // → 23 (the second to last '/')
 
-    int last_index_of(const T& value, int start_pos = -1) const {
-        if (!mem || allocated_size < sizeof(T)) return -1;
+    template <typename U = T>
+        requires std::is_same_v<U, const char>
+    int last_index_of(const char ch, int start_pos = -1) const {
+        if (!mem) return -1;
 
-        std::size_t count = allocated_size / sizeof(T);
-        T*          data = get();
+        const char* str = static_cast<const char*>(mem.get());
+        int         len = static_cast<int>(std::strlen(str));
 
-        if (start_pos < 0 || start_pos >= static_cast<int>(count)) start_pos = static_cast<int>(count) - 1;
+        // if no start position is specified, start at the end
+        if (start_pos < 0 || start_pos >= len) start_pos = len - 1;
 
         for (int i = start_pos; i >= 0; --i) {
-            if (data[i] == value) return i;
+            if (str[i] == ch) return i;
         }
         return -1;
     }
+
+    // int last_index_of(const T& value, int start_pos = -1) const {
+    //     if (!mem || allocated_size < sizeof(T)) return -1;
+
+    //     std::size_t count = allocated_size / sizeof(T);
+    //     T*          data = get();
+
+    //     if (start_pos < 0 || start_pos >= static_cast<int>(count)) start_pos = static_cast<int>(count) - 1;
+
+    //     for (int i = start_pos; i >= 0; --i) {
+    //         if (data[i] == value) return i;
+    //     }
+    //     return -1;
+    // }
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // 📌📌📌 I N D E X _ O F _ S U B S T R   📌📌📌
 
@@ -2152,12 +2224,17 @@ class ps_ptr {
     // 📌📌📌  C L E A R   📌📌📌
 
     void clear() {
-        if (mem && allocated_size > 0) { std::memset(mem.get(), 0, allocated_size); }
+        if (mem && allocated_size > 0) { std::memset(mem.get(), 0, allocated_size); length_ = 0; }
     }
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // 📌📌📌  S I Z E   📌📌📌
 
     size_t size() const { return allocated_size; }
+
+    // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
+    // 📌📌📌  E M P T Y   📌📌📌
+
+    bool empty() const noexcept { return allocated_size == 0; }
 
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // 📌📌📌  V A L I D   📌📌📌
@@ -2282,7 +2359,7 @@ class ps_ptr {
     T& operator*() const { return *get(); }
 
     // Safe operator[] with logging
-    T& operator[](std::size_t index) {
+    T& operator[](std::size_t index) noexcept {
         if (index >= allocated_size) {
             log_e("ps_ptr[]: Index %zu out of bounds (size = %zu)", index, allocated_size);
             return dummy; // Access allowed, but ineffective
@@ -2290,7 +2367,7 @@ class ps_ptr {
         return mem[index];
     }
 
-    const T& operator[](std::size_t index) const {
+    const T& operator[](std::size_t index) const noexcept {
         if (index >= allocated_size) {
             log_e("ps_ptr[] (const): Index %zu out of bounds (size = %zu)", index, allocated_size);
             return dummy;
@@ -2326,6 +2403,27 @@ class ps_ptr {
         append(rhs);
         return *this;
     }
+
+    // Iterator compatible accesses (make ps_ptr STL compatible)
+    T*       begin() noexcept { return mem.get(); }
+    const T* begin() const noexcept { return mem.get(); }
+
+    T*       end() noexcept { return mem.get() + allocated_size; }
+    const T* end() const noexcept { return mem.get() + allocated_size; }
+
+    const T* cbegin() const noexcept { return mem.get(); }
+    const T* cend() const noexcept { return mem.get() + allocated_size; }
+
+    // 🔹 Optional: pointer arithmetic (syntactic only)
+    T*       operator+(std::size_t offset) noexcept { return mem.get() + offset; }
+    const T* operator+(std::size_t offset) const noexcept { return mem.get() + offset; }
+
+    void fill(const T& value) { std::fill(begin(), end(), value); }
+
+    // Access as std::span – secure view of the data
+    std::span<T> span() noexcept { return std::span<T>(mem.get(), allocated_size); }
+
+    std::span<const T> span() const noexcept { return std::span<const T>(mem.get(), allocated_size); }
 };
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 // 📌📌📌  O P E R A T O R  📌📌📌 (witout class)
@@ -2629,9 +2727,9 @@ template <typename T> class ps_struct_ptr {
 
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // 📌📌📌  G E T   📌📌📌
-    T* get() { return mem.get(); }
+    T* get() noexcept { return mem.get(); }
 
-    const T* get() const { return mem.get(); }
+    const T* get() const noexcept { return mem.get(); }
 
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     inline void free_all_ptr_members(); // prototypes
