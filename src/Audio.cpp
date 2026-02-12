@@ -6389,7 +6389,7 @@ void Audio::IIR_calculateCoefficients() { // Infinite Impulse Response (IIR) fil
     float       normFreqLS = FcLS / m_sampleRate;    // filter cut off frequency
     float       normFreqPEQ = FcPKEQ / m_sampleRate; // filter center frequency
     float       normFreqHS = FcHS / m_sampleRate;    // filter cut off frequency
-    const float QS = 0.707;                          // Quality Slope (Shelf)
+    const float QS = 1.000;                          // Quality Slope (Shelf)
 
     float total_boost_db = fmax(fmax(fmax(0, m_audio_items.gain_ls_db), m_audio_items.gain_peq_db), m_audio_items.gain_hs_db); // dynamic headroom
     m_audio_items.pre_gain = powf(10.0, -total_boost_db / 20);
