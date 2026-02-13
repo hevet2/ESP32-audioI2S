@@ -1337,14 +1337,43 @@ void Audio::latinToUTF8(ps_ptr<char>& buff, bool UTF8check) {
 
     if (buff.size() < requiredSize) { buff.realloc(requiredSize); }
 
-    // coding into UTF-8
+    // coding into UTF-8 (ASCII + CP1250 for PL)
     while (iso8859_1[in] != '\0') {
-        if (iso8859_1[in] < 0x80) {
-            buff[out++] = iso8859_1[in++];
-        } else {
-            buff[out++] = (0xC0 | (iso8859_1[in] >> 6));
-            buff[out++] = (0x80 | (iso8859_1[in] & 0x3F));
-            in++;
+
+        uint8_t c = (uint8_t)iso8859_1[in++];
+
+        if (c < 0x80) {
+            // ASCII
+            buff[out++] = c;
+            continue;
+        }
+
+        // CP1250 → UTF-8 (PL znaki)
+        switch (c) {
+            case 0xB9: buff[out++] = 0xC4; buff[out++] = 0x85; break; // ą
+            case 0xA5: buff[out++] = 0xC4; buff[out++] = 0x84; break; // Ą
+            case 0xE6: buff[out++] = 0xC4; buff[out++] = 0x87; break; // ć
+            case 0xC6: buff[out++] = 0xC4; buff[out++] = 0x86; break; // Ć
+            case 0xEA: buff[out++] = 0xC4; buff[out++] = 0x99; break; // ę
+            case 0xCA: buff[out++] = 0xC4; buff[out++] = 0x98; break; // Ę
+            case 0xB3: buff[out++] = 0xC5; buff[out++] = 0x82; break; // ł
+            case 0xA3: buff[out++] = 0xC5; buff[out++] = 0x81; break; // Ł
+            case 0xF1: buff[out++] = 0xC5; buff[out++] = 0x84; break; // ń
+            case 0xD1: buff[out++] = 0xC5; buff[out++] = 0x83; break; // Ń
+            case 0xF3: buff[out++] = 0xC3; buff[out++] = 0xB3; break; // ó
+            case 0xD3: buff[out++] = 0xC3; buff[out++] = 0x93; break; // Ó
+            case 0x9C: buff[out++] = 0xC5; buff[out++] = 0x9B; break; // ś
+            case 0x8C: buff[out++] = 0xC5; buff[out++] = 0x9A; break; // Ś
+            case 0xBF: buff[out++] = 0xC5; buff[out++] = 0xBC; break; // ż
+            case 0xAF: buff[out++] = 0xC5; buff[out++] = 0xBB; break; // Ż
+            case 0x9F: buff[out++] = 0xC5; buff[out++] = 0xBA; break; // ź
+            case 0x8F: buff[out++] = 0xC5; buff[out++] = 0xB9; break; // Ź
+
+            default:
+                // fallback: Latin-1 → UTF-8
+                buff[out++] = 0xC0 | (c >> 6);
+                buff[out++] = 0x80 | (c & 0x3F);
+                break;
         }
     }
     buff[out] = '\0';
