@@ -341,7 +341,7 @@ struct fnsy_t { // used in findNextSync
 
 struct audioItems_t {
     uint16_t        freq_ls_Hz = 500;   // lowshelf
-    uint16_t        freq_peq_Hz = 1800; // peakingEQ
+    uint16_t        freq_peq_Hz = 3000; // peakingEQ
     uint16_t        freq_hs_Hz = 6000;  // highshelf
     float           gain_ls_db = 0.0;
     float           gain_peq_db = 0.0;
