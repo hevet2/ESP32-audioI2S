@@ -6338,9 +6338,9 @@ void Audio::setTone(float gainLowPass, float gainBandPass, float gainHighPass) {
     // gainBandPass  set between -12 ... +12 dB
     // gainHighPass  set between -12 ... +12 dB
 
-    m_audio_items.gain_ls_db = fminf(fmaxf(gainLowPass, -12.0f), 12.0f);
-    m_audio_items.gain_peq_db = fminf(fmaxf(gainBandPass, -12.0f), 12.0f);
-    m_audio_items.gain_hs_db = fminf(fmaxf(gainHighPass, -12.0f), 12.0f);
+    m_audio_items.gain_ls_db = fminf(fmaxf(gainLowPass, -16.0f), 16.0f);
+    m_audio_items.gain_peq_db = fminf(fmaxf(gainBandPass, -16.0f), 16.0f);
+    m_audio_items.gain_hs_db = fminf(fmaxf(gainHighPass, -16.0f), 16.0f);
 
     IIR_calculateCoefficients();
 }
@@ -6584,7 +6584,7 @@ void Audio::IIR_calculateCoefficients() { // Infinite Impulse Response (IIR) fil
     float       normFreqLS = FcLS / m_i2s_items.sampleRate;    // filter cut off frequency
     float       normFreqPEQ = FcPKEQ / m_i2s_items.sampleRate; // filter center frequency
     float       normFreqHS = FcHS / m_i2s_items.sampleRate;    // filter cut off frequency
-    const float QS = 0.707;                                    // Quality Slope (Shelf)
+    const float QS = 1.000;                                    // Quality Slope (Shelf)
 
     float total_boost_db = fmax(fmax(fmax(0, m_audio_items.gain_ls_db), m_audio_items.gain_peq_db), m_audio_items.gain_hs_db); // dynamic headroom
     m_audio_items.pre_gain = powf(10.0, -total_boost_db / 20);
