@@ -212,6 +212,7 @@ struct pwst_t { // used in processWebStream
     bool     f_skipCRLF = false;
     uint32_t availableBytes;
     bool     f_clientIsConnected;
+    uint32_t writeSpace = 0;
     uint16_t readedBytes;
 };
 
@@ -337,9 +338,6 @@ struct fnsy_t { // used in findNextSync
 };
 
 struct audioItems_t {
-    uint16_t freq_ls_Hz = 500;   // lowshelf
-    uint16_t freq_peq_Hz = 1800; // peakingEQ
-    uint16_t freq_hs_Hz = 6000;  // highshelf
     float    gain_ls_db = 0.0;   // lowshelf
     float    gain_peq_db = 0.0;  // peakingEQ
     float    gain_hs_db = 0.0;   // highshelf
@@ -354,8 +352,8 @@ struct audioItems_t {
     bool     mute = false;
 };
 
-#define DMA_DESC_NUM  32  // number of I2S DMA buffer
-#define DMA_FRAME_NUM 288 // number of frames in one DMA buffer
+#define DMA_DESC_NUM  16  // number of I2S DMA buffer
+#define DMA_FRAME_NUM 192 // number of frames in one DMA buffer
 struct i2s_items_t {
     uint16_t DESC_NUM = DMA_DESC_NUM;
     uint16_t FRAME_NUM = DMA_FRAME_NUM;
