@@ -4,8 +4,8 @@
 
     Created on: 28.10.2018                                                                                                  */
 char audioI2SVers[] = "\
-    Version 3.4.5d                                                                                                                            ";
-/*  Updated on: Mar 12, 2026
+    Version 3.4.5h                                                                                                                            ";
+/*  Updated on: Mar 18, 2026
 
     Author: Wolle (schreibfaul1)
     Audio library for ESP32, ESP32-S3 or ESP32-P4
@@ -339,8 +339,6 @@ Audio::Audio(uint8_t i2sPort) {
     mutex_audioTask = xSemaphoreCreateMutex();
     mutex_audioTaskIsDecoding = xSemaphoreCreateMutex();
 
-    if (!psramFound()) AUDIO_LOG_ERROR("audioI2S requires PSRAM!");
-
     clientsecure.setInsecure();
     m_i2s_items.i2s_num = i2sPort; // i2s port number
 
@@ -369,9 +367,6 @@ Audio::Audio(uint8_t i2sPort) {
     m_i2s_std_cfg.clk_cfg.clk_src = I2S_CLK_SRC_DEFAULT;
     m_i2s_std_cfg.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;
     i2s_channel_init_std_mode(m_i2s_tx_handle, &m_i2s_std_cfg);
-
-    calculateVolumeLimits(); // first init, vol = 21, vol_steps = 21
-    startAudioTask();
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 Audio::~Audio() {
@@ -4197,6 +4192,7 @@ void Audio::processWebStream() {
 
     m_pwst.availableBytes = 0; // available from stream
     m_pwst.f_clientIsConnected = m_client->connected();
+    m_pwst.writeSpace = UINT16_MAX;
 
     // first call, set some values to default  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_f_firstCall) { // runs only ont time per connection, prepare for start
@@ -4209,8 +4205,8 @@ void Audio::processWebStream() {
         getChunkSize(0, true);
         m_audioFilePosition = 0;
     }
-    if (m_pwst.f_clientIsConnected) m_pwst.availableBytes = m_client->available(); // available from stream
 
+    if (m_pwst.f_clientIsConnected) m_pwst.availableBytes = m_client->available(); // available from stream
     // chunked data tramsfer
     if (m_f_chunked && m_pwst.availableBytes) {
         if (m_pwst.chunkSize == 0) {
@@ -4221,7 +4217,7 @@ void Audio::processWebStream() {
             m_pwst.chunkSize = chunkLen;
             m_pwst.readedBytes = 0; // readedBytes is not a part of chunkSize
         }
-        m_pwst.availableBytes = min(m_pwst.availableBytes, m_pwst.chunkSize);
+        m_pwst.writeSpace = min(m_pwst.writeSpace, m_pwst.chunkSize);
     }
 
     // we have metadata  - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -4235,7 +4231,7 @@ void Audio::processWebStream() {
         m_metacount = m_metaint;
         return;
     }
-    if (m_f_metadata) m_pwst.availableBytes = min(m_pwst.availableBytes, m_metacount);
+    if (m_f_metadata) m_pwst.writeSpace = min(m_pwst.writeSpace, m_metacount);
 
     // if the buffer is often almost empty issue a warning - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_f_stream) {
@@ -4248,8 +4244,10 @@ void Audio::processWebStream() {
 
     // buffer fill routine - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_pwst.availableBytes) {
-        m_pwst.availableBytes = min(m_pwst.availableBytes, (uint32_t)InBuff.writeSpace());
-        int32_t bytesAddedToBuffer = audioFileRead(InBuff.getWritePtr(), min(m_pwst.availableBytes, (uint32_t)UINT16_MAX));
+        m_pwst.writeSpace = min(m_pwst.writeSpace, (uint32_t)InBuff.writeSpace());
+        int32_t bytesAddedToBuffer = audioFileRead(InBuff.getWritePtr(), min(m_pwst.writeSpace, (uint32_t)UINT16_MAX));
+        m_pwst.writeSpace -= bytesAddedToBuffer;
+
         if (bytesAddedToBuffer > 0) {
             if (m_f_metadata) m_metacount -= bytesAddedToBuffer;
             if (m_f_chunked) m_pwst.chunkSize -= bytesAddedToBuffer;
@@ -5883,6 +5881,10 @@ bool Audio::setPinout(uint8_t BCLK, uint8_t LRC, uint8_t DOUT, int8_t MCLK) {
     I2Sstart();
 
 exit:
+
+    calculateVolumeLimits(); // first init, vol = 21, vol_steps = 21
+    startAudioTask();
+
     m_f_I2S_init = result;
     return m_f_I2S_init;
 }
@@ -6289,30 +6291,27 @@ void Audio::calculateVUlevel(int32_t* sample) { // Envelope-Follower
         m_vu_items.right -= RELEASE;
     }
 
-    constexpr uint16_t PEAK_HOLD_SAMPLES = 2000; // ca. 20 ms @ 48 kHz
-    constexpr uint8_t  PEAK_RELEASE = 1;         // Fall rate
-
     // LEFT
     if (m_vu_items.left > m_vu_items.left_peak) {
         m_vu_items.left_peak = m_vu_items.left;
-        m_vu_items.left_hold = PEAK_HOLD_SAMPLES;
+        m_vu_items.left_hold = settings.PEAK_HOLD_SAMPLES;
     } else {
         if (m_vu_items.left_hold > 0) {
             m_vu_items.left_hold--;
-        } else if (m_vu_items.left_peak > PEAK_RELEASE) {
-            m_vu_items.left_peak -= PEAK_RELEASE;
+        } else if (m_vu_items.left_peak > settings.PEAK_RELEASE) {
+            m_vu_items.left_peak -= settings.PEAK_RELEASE;
         }
     }
 
     // RIGHT
     if (m_vu_items.right > m_vu_items.right_peak) {
         m_vu_items.right_peak = m_vu_items.right;
-        m_vu_items.right_hold = PEAK_HOLD_SAMPLES;
+        m_vu_items.right_hold = settings.PEAK_HOLD_SAMPLES;
     } else {
         if (m_vu_items.right_hold > 0) {
             m_vu_items.right_hold--;
-        } else if (m_vu_items.right_peak > PEAK_RELEASE) {
-            m_vu_items.right_peak -= PEAK_RELEASE;
+        } else if (m_vu_items.right_peak > settings.PEAK_RELEASE) {
+            m_vu_items.right_peak -= settings.PEAK_RELEASE;
         }
     }
 }
@@ -6576,14 +6575,14 @@ void Audio::IIR_calculateCoefficients() { // Infinite Impulse Response (IIR) fil
 
     AUDIO_LOG_DEBUG("gain gain_ls_db %f, gain gain_peq_db %f, gain gain_hs_db %f", m_audio_items.gain_ls_db, m_audio_items.gain_peq_db, m_audio_items.gain_hs_db);
 
-    const float FcLS = m_audio_items.freq_ls_Hz;    // Frequency LowShelf(Hz)
-    const float FcPKEQ = m_audio_items.freq_peq_Hz; // Frequency PeakEQ(Hz)
-    const float FcHS = m_audio_items.freq_hs_Hz;    // Frequency HighShelf(Hz)
+    const float FcLS = settings.FREQ_LS_HZ;     // Frequency LowShelf(Hz)
+    const float FcPKEQ = settings.FREQ_PEAK_HZ; // Frequency PeakEQ(Hz)
+    const float FcHS = settings.FREQ_HS_HZ;     // Frequency HighShelf(Hz)
+    const float QS = settings.QUALITY_SLOPE;    // Quality Slope (Shelf)
 
-    float       normFreqLS = FcLS / m_i2s_items.sampleRate;    // filter cut off frequency
-    float       normFreqPEQ = FcPKEQ / m_i2s_items.sampleRate; // filter center frequency
-    float       normFreqHS = FcHS / m_i2s_items.sampleRate;    // filter cut off frequency
-    const float QS = 0.707;                                    // Quality Slope (Shelf)
+    float normFreqLS = FcLS / m_i2s_items.sampleRate;    // filter cut off frequency
+    float normFreqPEQ = FcPKEQ / m_i2s_items.sampleRate; // filter center frequency
+    float normFreqHS = FcHS / m_i2s_items.sampleRate;    // filter cut off frequency
 
     float total_boost_db = fmax(fmax(fmax(0, m_audio_items.gain_ls_db), m_audio_items.gain_peq_db), m_audio_items.gain_hs_db); // dynamic headroom
     m_audio_items.pre_gain = powf(10.0, -total_boost_db / 20);
