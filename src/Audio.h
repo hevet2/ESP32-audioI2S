@@ -459,8 +459,6 @@ class Audio {
     size_t         m_audioDataSize = 0;             //
     size_t         m_ibuffSize = 0;                 // log buffer size for audio_info()
     size_t         m_i2s_bytesWritten = 0;          // set in i2s_write() but not used
-    String         m_icyNameStr;
-    bool           m_isProblematicStream = false;
 
     pid_array m_pidsOfPMT;
     int16_t   m_pidOfAAC;
