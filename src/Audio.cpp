@@ -4203,7 +4203,13 @@ void Audio::processWebStream() {
     if (m_f_metadata && (m_metacount == 0)) {
         if (!m_pwst.availableBytes) return;
         readedBytes = 0;
-        bool res = readMetadata(min(m_pwst.availableBytes, m_pwst.chunkSize), &readedBytes);
+        
+        bool res;
+        if (m_isProblematicStream) {
+            res = readMetadata(min(m_pwst.availableBytes, m_pwst.chunkSize), &readedBytes);
+        } else {
+            res = readMetadata(m_pwst.availableBytes, &readedBytes);
+        }
         m_pwst.readedBytes += readedBytes;
         if (m_f_chunked) m_pwst.chunkSize -= readedBytes; // reduce chunkSize by metadata length
         if (res == false) return;
@@ -4906,7 +4912,15 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
             ps_ptr<char> icyName;
             icyName.assign(rhl.get() + 9); // Get station name
             icyName.trim();
-            if (icyName.strlen() > 0) { info(*this, evt_name, "%s", icyName.get()); }
+            if (icyName.strlen() > 0) {
+                m_icyNameStr = icyName.get();
+                if (m_icyNameStr.indexOf("Opole") >= 0) {
+                    m_isProblematicStream = true;
+                } else {
+                    m_isProblematicStream = false;
+                }
+                info(*this, evt_name, "%s", icyName.get());
+            }
         }
 
         else if (rhl.starts_with_icase("content-length:")) {
