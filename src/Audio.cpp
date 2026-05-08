@@ -4,8 +4,8 @@
 
     Created on: 28.10.2018                                                                                                  */
 char audioI2SVers[] = "\
-    Version 3.4.5q                                                                                                                            ";
-/*  Updated on: May 03, 2026
+    Version 3.4.5r                                                                                                                            ";
+/*  Updated on: May 08, 2026
 
     Author: Wolle (schreibfaul1)
     Audio library for ESP32, ESP32-S3 or ESP32-P4
@@ -459,6 +459,7 @@ void Audio::setDefaults() {
     m_streamType = ST_NONE;
     m_codec = CODEC_NONE;
     m_playlistFormat = FORMAT_NONE;
+    m_f_allDataReceived = false;
     m_dataMode = AUDIO_NONE;
     m_streamTitle.assign("");
     m_streamURL.assign("");
