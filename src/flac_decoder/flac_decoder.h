@@ -250,10 +250,10 @@ private:
 
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // Macro for comfortable calls
-    #define FLAC_LOG_ERROR(fmt, ...)   Audio::AUDIO_LOG_IMPL(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-    #define FLAC_LOG_WARN(fmt, ...)    Audio::AUDIO_LOG_IMPL(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-    #define FLAC_LOG_INFO(fmt, ...)    Audio::AUDIO_LOG_IMPL(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-    #define FLAC_LOG_DEBUG(fmt, ...)   Audio::AUDIO_LOG_IMPL(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-    #define FLAC_LOG_VERBOSE(fmt, ...) Audio::AUDIO_LOG_IMPL(5, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    #define FLAC_LOG_ERROR(fmt, ...)   Audio::AUDIO_LOG_IMPLF(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    #define FLAC_LOG_WARN(fmt, ...)    Audio::AUDIO_LOG_IMPLF(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    #define FLAC_LOG_INFO(fmt, ...)    Audio::AUDIO_LOG_IMPLF(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    #define FLAC_LOG_DEBUG(fmt, ...)   Audio::AUDIO_LOG_IMPLF(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+    #define FLAC_LOG_VERBOSE(fmt, ...) Audio::AUDIO_LOG_IMPLF(5, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 };
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
