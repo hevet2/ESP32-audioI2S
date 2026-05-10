@@ -425,7 +425,7 @@ void Audio::setDefaults() {
     ts_parsePacket(0, 0, 0);                         // reset ts routine
     m_lastM3U8host.reset();
 
-    AUDIO_LOG_DEBUG("buffers freed, free Heap: %u bytes", (unsigned)ESP.getFreeHeap());
+    AUDIO_LOGF_DEBUG("buffers freed, free Heap: {} bytes", (unsigned)ESP.getFreeHeap());
 
     m_f_timeout = false;
     m_f_chunked = false; // Assume not chunked
@@ -517,7 +517,7 @@ bool Audio::openai_speech(const String& api_key, const String& model, const Stri
     char path[] = "/v1/audio/speech";
 
     if (input == "") {
-        AUDIO_LOG_WARN("input text is empty");
+        AUDIO_LOGF_WARN("input text is empty");
         stopSong();
         return false;
     }
@@ -616,7 +616,7 @@ bool Audio::openai_speech(const String& api_key, const String& model, const Stri
         m_dataMode = HTTP_RESPONSE_HEADER;
         m_f_tts = true;
     } else {
-        AUDIO_LOG_WARN("Request %s failed!", host.get());
+        AUDIO_LOGF_WARN("Request {} failed!", host.get());
     }
     xSemaphoreGiveRecursive(mutex_playAudioData);
     return res;
@@ -676,12 +676,12 @@ audiolib::hwoe_t Audio::dismantle_host(const char* host) {
 bool Audio::connecttohost(const char* host, const char* user, const char* pwd) { // user and pwd for authentification only, can be empty
 
     if (!host) {
-        AUDIO_LOG_ERROR("Hostaddress is empty");
+        AUDIO_LOGF_ERROR("Hostaddress is empty");
         stopSong();
         return false;
     }
     if (strlen(host) > 2048) {
-        AUDIO_LOG_ERROR("Hostaddress is too long");
+        AUDIO_LOGF_ERROR("Hostaddress is too long");
         stopSong();
         return false;
     } // max length in Chrome DevTools
@@ -808,7 +808,7 @@ bool Audio::connecttohost(const char* host, const char* user, const char* pwd) {
         m_dataMode = HTTP_RESPONSE_HEADER; // Handle header
         m_streamType = ST_WEBSTREAM;
     } else {
-        AUDIO_LOG_ERROR("Request %s failed!", c_host.get());
+        AUDIO_LOGF_ERROR("Request {} failed!", c_host.get());
         m_f_running = false;
         info(*this, evt_name, "");
         info(*this, evt_streamtitle, "");
@@ -823,7 +823,7 @@ bool Audio::httpPrint(const char* host) {
     // user and pwd for authentification only, can be empty
     if (!m_f_running) return false;
     if (host == NULL) {
-        AUDIO_LOG_ERROR("Hostaddress is empty");
+        AUDIO_LOGF_ERROR("Hostaddress is empty");
         stopSong();
         return false;
     }
@@ -904,7 +904,7 @@ bool Audio::httpPrint(const char* host) {
         if (f_equal) info(*this, evt_info, "The host has disconnected, reconnecting");
 
         if (!m_client->connect(hwoe.get(), port)) {
-            AUDIO_LOG_ERROR("connection lost %s", c_host.c_get());
+            AUDIO_LOGF_ERROR("connection lost {}", c_host.c_get());
             stopSong();
             return false;
         }
@@ -940,7 +940,7 @@ bool Audio::httpPrint(const char* host) {
     m_dataMode = HTTP_RESPONSE_HEADER; // Handle header
     m_streamType = ST_WEBSTREAM;
     m_f_chunked = false;
-    AUDIO_LOG_DEBUG("playlistFormat %s, dataMode %s, streamType: %s", plsFmtStr[m_playlistFormat], dataModeStr[m_dataMode], streamTypeStr[m_streamType]);
+    AUDIO_LOGF_DEBUG("playlistFormat {}, dataMode {}, streamType: {}", plsFmtStr[m_playlistFormat], dataModeStr[m_dataMode], streamTypeStr[m_streamType]);
     return true;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -1017,7 +1017,7 @@ bool Audio::httpRange(uint32_t seek, uint32_t length) {
     }
 
     if (!m_client->connect(hwoe.get(), port)) {
-        AUDIO_LOG_ERROR("connection lost %s", c_host.c_get());
+        AUDIO_LOGF_ERROR("connection lost {}", c_host.c_get());
         stopSong();
         return false;
     }
@@ -1040,13 +1040,13 @@ bool Audio::connecttoFS(fs::FS& fs, const char* path, int32_t fileStartTime) {
     m_codec = CODEC_NONE;
 
     if (!path) {
-        AUDIO_LOG_ERROR("file path is not set");
+        AUDIO_LOGF_ERROR("file path is not set");
         goto exit;
     } // guard
     c_path.copy_from(path); // copy from path
     c_path.trim();
     if (!c_path.contains(".")) {
-        AUDIO_LOG_ERROR("No file extension found");
+        AUDIO_LOGF_ERROR("No file extension found");
         goto exit;
     } // guard
     setDefaults(); // free buffers an set defaults
@@ -1063,14 +1063,14 @@ bool Audio::connecttoFS(fs::FS& fs, const char* path, int32_t fileStartTime) {
     if (m_codec == CODEC_OGG) m_f_ogg = true;
     if (m_codec == CODEC_NONE) { // guard
         int dotPos = c_path.last_index_of('.');
-        AUDIO_LOG_WARN("The %s format is not supported", path + dotPos);
+        AUDIO_LOGF_WARN("The {} format is not supported", path + dotPos);
         goto exit;
     }
 
     if (!c_path.starts_with("/")) c_path.insert("/", 0);
 
     if (!fs.exists(c_path.get())) {
-        AUDIO_LOG_WARN("file not found: %s", c_path.get());
+        AUDIO_LOGF_WARN("file not found: {}", c_path.get());
         goto exit;
     }
     info(*this, evt_info, "Reading file: \"%s\"", c_path.get());
@@ -1114,7 +1114,7 @@ bool Audio::connecttospeech(const char* speech, const char* lang) {
     m_client = static_cast<NetworkClient*>(&client);
     info(*this, evt_info, "connect to \"%s\"", host);
     if (!m_client->connect(host, 80)) {
-        AUDIO_LOG_ERROR("Connection failed");
+        AUDIO_LOGF_ERROR("Connection failed");
         xSemaphoreGiveRecursive(mutex_playAudioData);
         return false;
     }
@@ -1248,7 +1248,7 @@ void Audio::showID3Tag(const char* tag, const char* value) {
     if (!strcmp(tag, "XDOR")) id3tag.appendf("OriginalReleaseTime: %s", value, "id3tag");
 
     if (!id3tag.valid()) {
-        AUDIO_LOG_DEBUG("unknown tag: %s", tag);
+        AUDIO_LOGF_DEBUG("unknown tag: {}", tag);
         return;
     }
     latinToUTF8(id3tag);
@@ -1479,7 +1479,7 @@ size_t Audio::readAudioHeader(uint32_t bytes) {
     if (m_codec == CODEC_VORBIS) { m_controlCounter = 100; }
     if (m_codec == CODEC_OGG) { m_controlCounter = 100; }
     if (!isRunning()) {
-        AUDIO_LOG_ERROR("Processing stopped due to invalid audio header");
+        AUDIO_LOGF_ERROR("Processing stopped due to invalid audio header");
         return 0;
     }
     return bytesReaded;
@@ -1492,7 +1492,7 @@ int Audio::read_WAV_Header(uint8_t* data, size_t len) {
         m_rwh.bts = 0;
         m_controlCounter++;
         if ((*data != 'R') || (*(data + 1) != 'I') || (*(data + 2) != 'F') || (*(data + 3) != 'F')) {
-            AUDIO_LOG_ERROR("file has no RIFF tag");
+            AUDIO_LOGF_ERROR("file has no RIFF tag");
             m_rwh.headerSize = 0;
             return -1; // false;
         } else {
@@ -1511,7 +1511,7 @@ int Audio::read_WAV_Header(uint8_t* data, size_t len) {
     if (m_controlCounter == 2) {
         m_controlCounter++;
         if ((*data != 'W') || (*(data + 1) != 'A') || (*(data + 2) != 'V') || (*(data + 3) != 'E')) {
-            AUDIO_LOG_ERROR("format tag is not WAVE");
+            AUDIO_LOGF_ERROR("format tag is not WAVE");
             return -1; // false;
         } else {
             m_rwh.headerSize += 4;
@@ -1566,7 +1566,7 @@ int Audio::read_WAV_Header(uint8_t* data, size_t len) {
             return -1;
         }
         if (fc != 1) {
-            AUDIO_LOG_ERROR("format code is not 1 (PCM)");
+            AUDIO_LOGF_ERROR("format code is not 1 (PCM)");
             stopSong();
             return -1; // false;
         }

@@ -27,7 +27,9 @@
 #include <libb64/cencode.h>
 #include <locale>
 #include <memory>
+#include <format>
 #include <span>
+#include <tuple>
 #include <vector>
 
 #ifndef I2S_GPIO_UNUSED
@@ -527,6 +529,19 @@ class Audio {
     // specialization for nullptr / NULL
     static const char* safe_arg(std::nullptr_t) { return "(null)"; }
 
+    // Helper for {}-style formatting (AUDIO_LOG_IMPLF)
+    static const char* safe_argf(const char* v) { return v ? v : "(null)"; }
+    static char*       safe_argf(char* v) { return v ? v : (char*)"(null)"; }
+    template <size_t N> static const char* safe_argf(const char (&v)[N]) { return v; }
+    static const char* safe_argf(const std::string& v) { return v.c_str(); }
+    static std::string_view safe_argf(std::string_view v) { return v; }
+    static const char* safe_argf(ps_ptr<char>& v) { return v.c_get() ? v.c_get() : "(null)"; }
+    static const char* safe_argf(const ps_ptr<char>& v) { return v.c_get() ? v.c_get() : "(null)"; }
+    static const void* safe_argf(uint8_t* v) { return static_cast<const void*>(v); }
+    static const void* safe_argf(const uint8_t* v) { return static_cast<const void*>(v); }
+    static const char* safe_argf(std::nullptr_t) { return "(null)"; }
+    template <typename T> static auto safe_argf(T&& v) -> decltype(auto) { return std::forward<T>(v); }
+
     template <typename... Args> static bool info(Audio& instance, event_t e, const char* fmt, Args&&... args) {
         std::lock_guard<std::mutex> lock(instance.mutex_info); // lock mutex
                                                                // -------------------------------------------------------------------------------------------------------------------
@@ -666,11 +681,75 @@ class Audio {
         logStr.reset();
     }
 
+    template <typename... Args> static void AUDIO_LOG_IMPLF(uint8_t level, const char* path, int line, std::string_view fmt, Args&&... args) {
+        ps_ptr<char> logStr;
+        logStr.copy_from(path);
+        while (logStr.contains("/")) { logStr.remove_before('/', false); }
+        logStr.appendf(":%i ", line);
+
+        if (level == 1 && CORE_DEBUG_LEVEL >= 1) {
+            logStr.append(ANSI_ESC_RED);
+        } else if (level == 2 && CORE_DEBUG_LEVEL >= 2) {
+            logStr.append(ANSI_ESC_YELLOW);
+        } else if (level == 3 && CORE_DEBUG_LEVEL >= 3) {
+            logStr.append(ANSI_ESC_GREEN);
+        } else if (level == 4 && CORE_DEBUG_LEVEL >= 4) {
+            logStr.append(ANSI_ESC_CYAN);
+        } else if (level == 5 && CORE_DEBUG_LEVEL >= 4) {
+            logStr.append(ANSI_ESC_WHITE);
+        } else {
+            return;
+        }
+
+        std::string formatted;
+        try {
+            auto convertedArgs = std::make_tuple(safe_argf(std::forward<Args>(args))...);
+            formatted = std::apply(
+                [&](auto&... a) {
+                    return std::vformat(fmt, std::make_format_args(a...));
+                },
+                convertedArgs
+            );
+        } catch (const std::format_error& ex) {
+            formatted = std::string("[format_error] ") + ex.what();
+        }
+
+        logStr.append(formatted.c_str());
+        logStr.append(ANSI_ESC_RESET);
+
+        msg_t msg;
+        msg.msg = logStr.get();
+        const char* tag[7] = {"", "LOGE", "LOGW", "LOGI", "LOGD", "LOGV", ""};
+        msg.s = tag[level];
+        msg.e = evt_log;
+
+        if (audio_info_callback)
+            audio_info_callback(msg);
+        else {
+            if (level == 1)
+                log_e("%s", logStr.c_get());
+            else if (level == 2)
+                log_w("%s", logStr.c_get());
+            else if (level == 3)
+                log_i("%s", logStr.c_get());
+            else if (level == 4)
+                log_d("%s", logStr.c_get());
+            else
+                log_v("%s", logStr.c_get());
+        }
+        logStr.reset();
+    }
+
 // Macro for comfortable calls
 #define AUDIO_LOG_ERROR(fmt, ...) AUDIO_LOG_IMPL(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #define AUDIO_LOG_WARN(fmt, ...)  AUDIO_LOG_IMPL(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #define AUDIO_LOG_INFO(fmt, ...)  AUDIO_LOG_IMPL(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 #define AUDIO_LOG_DEBUG(fmt, ...) AUDIO_LOG_IMPL(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+
+#define AUDIO_LOGF_ERROR(fmt, ...) AUDIO_LOG_IMPLF(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOGF_WARN(fmt, ...)  AUDIO_LOG_IMPLF(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOGF_INFO(fmt, ...)  AUDIO_LOG_IMPLF(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOGF_DEBUG(fmt, ...) AUDIO_LOG_IMPLF(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 };
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 // 📌📌📌  D E C O D E R  📌📌📌
