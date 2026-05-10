@@ -2,7 +2,7 @@
  *  aac_decoder.h
  *  faad2 - ESP32 adaptation
  *  Created on: 12.09.2023
- *  Updated on: 13.08.2024
+ *  Updated on: 10.05.2026
  */
 
 #pragma once
@@ -75,9 +75,9 @@ class AACDecoder : public Decoder {
 
 // ——————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 //  Macro for comfortable calls
-#define AAC_LOG_ERROR(fmt, ...)   Audio::AUDIO_LOG_IMPL(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AAC_LOG_WARN(fmt, ...)    Audio::AUDIO_LOG_IMPL(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AAC_LOG_INFO(fmt, ...)    Audio::AUDIO_LOG_IMPL(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AAC_LOG_DEBUG(fmt, ...)   Audio::AUDIO_LOG_IMPL(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AAC_LOG_VERBOSE(fmt, ...) Audio::AUDIO_LOG_IMPL(5, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AAC_LOG_ERROR(fmt, ...)   Audio::AUDIO_LOG_IMPLF(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AAC_LOG_WARN(fmt, ...)    Audio::AUDIO_LOG_IMPLF(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AAC_LOG_INFO(fmt, ...)    Audio::AUDIO_LOG_IMPLF(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AAC_LOG_DEBUG(fmt, ...)   Audio::AUDIO_LOG_IMPLF(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AAC_LOG_VERBOSE(fmt, ...) Audio::AUDIO_LOG_IMPLF(5, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 };

@@ -741,15 +741,11 @@ class Audio {
     }
 
 // Macro for comfortable calls
-#define AUDIO_LOG_ERROR(fmt, ...) AUDIO_LOG_IMPL(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOG_WARN(fmt, ...)  AUDIO_LOG_IMPL(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOG_INFO(fmt, ...)  AUDIO_LOG_IMPL(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOG_DEBUG(fmt, ...) AUDIO_LOG_IMPL(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOG_ERROR(fmt, ...) AUDIO_LOG_IMPLF(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOG_WARN(fmt, ...)  AUDIO_LOG_IMPLF(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOG_INFO(fmt, ...)  AUDIO_LOG_IMPLF(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOG_DEBUG(fmt, ...) AUDIO_LOG_IMPLF(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
-#define AUDIO_LOGF_ERROR(fmt, ...) AUDIO_LOG_IMPLF(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOGF_WARN(fmt, ...)  AUDIO_LOG_IMPLF(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOGF_INFO(fmt, ...)  AUDIO_LOG_IMPLF(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOGF_DEBUG(fmt, ...) AUDIO_LOG_IMPLF(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 };
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 // 📌📌📌  D E C O D E R  📌📌📌
@@ -862,7 +858,7 @@ class _AutoProfiler {
 
         if (count >= N) {
             double avg_us = (double)sum / count;
-            printf(ANSI_ESC_CYAN "PROFILER [%s] avg: %.2f µs over %u runs" ANSI_ESC_RESET "\n", tag, avg_us, count);
+            printf(ANSI_ESC_CYAN "PROFILER [{}] avg: {:.2f} µs over {} runs" ANSI_ESC_RESET "\n", tag, avg_us, count);
             sum = 0;
             count = 0;
         }
