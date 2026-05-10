@@ -2600,7 +2600,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         m_m4aHdr.sizeof_mdia -= atom_size.to_uint32(16);
 
         if (atom_name.equals("mdhd")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             m_m4aHdr.sizeof_mdhd = atom_size.to_uint32(16) - 8;
             m_m4aHdr.retvalue += 8;
             m_m4aHdr.headerSize += 8;
@@ -2609,7 +2609,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         }
 
         if (atom_name.equals("minf")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             m_m4aHdr.sizeof_minf = atom_size.to_uint32(16) - 8;
             m_m4aHdr.retvalue += 8;
             m_m4aHdr.headerSize += 8;
@@ -2617,14 +2617,14 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             return 0;
         }
 
-        if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+        if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
         m_m4aHdr.retvalue += atom_size.to_uint32(16);
         m_m4aHdr.headerSize += atom_size.to_uint32(16);
         return 0;
     }
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_controlCounter == M4A_MINF) { // minf
-        if (atom_struct) { AUDIO_LOG_WARN("minf size remain %zu", m_m4aHdr.sizeof_minf); }
+        if (atom_struct) { AUDIO_LOGF_WARN("minf size remain {}", m_m4aHdr.sizeof_minf); }
         if (m_m4aHdr.sizeof_minf == 0) {
             m_controlCounter = M4A_MDIA;
             return 0;
@@ -2635,7 +2635,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         m_m4aHdr.sizeof_minf -= atom_size.to_uint32(16);
 
         if (atom_name.equals("stbl")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             m_m4aHdr.sizeof_stbl = atom_size.to_uint32(16) - 8;
             m_m4aHdr.retvalue += 8;
             m_m4aHdr.headerSize += 8;
@@ -2643,14 +2643,14 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             return 0;
         }
 
-        if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+        if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
         m_m4aHdr.retvalue += atom_size.to_uint32(16);
         m_m4aHdr.headerSize += atom_size.to_uint32(16);
         return 0;
     }
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_controlCounter == M4A_MDHD) { // mdhd
-        if (atom_struct) { AUDIO_LOG_WARN("mdhd size remain %zu", m_m4aHdr.sizeof_mdhd); }
+        if (atom_struct) { AUDIO_LOGF_WARN("mdhd size remain {}", m_m4aHdr.sizeof_mdhd); }
         if (m_m4aHdr.sizeof_mdhd == 0) {
             m_controlCounter = M4A_MDIA;
             return 0;
@@ -2680,7 +2680,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
     }
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_controlCounter == M4A_STBL) { // minf
-        if (atom_struct) { AUDIO_LOG_WARN("stbl size remain %zu", m_m4aHdr.sizeof_stbl); }
+        if (atom_struct) { AUDIO_LOGF_WARN("stbl size remain {}", m_m4aHdr.sizeof_stbl); }
         if (m_m4aHdr.sizeof_stbl == 0) {
             m_controlCounter = M4A_MINF;
             return 0;
@@ -2691,7 +2691,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         m_m4aHdr.sizeof_stbl -= atom_size.to_uint32(16);
 
         if (atom_name.equals("stsd")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             uint8_t header_size = 8;
             m_m4aHdr.sizeof_stsd = atom_size.to_uint32(16) - 8 - header_size;
             m_m4aHdr.retvalue += 8 + header_size;
@@ -2701,7 +2701,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         }
 
         if (atom_name.equals("stsz")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             uint8_t header_size = 8;
             m_m4aHdr.sizeof_stsz = atom_size.to_uint32(16) - 8 - header_size;
             m_m4aHdr.retvalue += 8;
@@ -2710,14 +2710,14 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             return 0;
         }
 
-        if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+        if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
         m_m4aHdr.retvalue += atom_size.to_uint32(16);
         m_m4aHdr.headerSize += atom_size.to_uint32(16);
         return 0;
     }
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_controlCounter == M4A_STSD) {
-        if (atom_struct) { AUDIO_LOG_WARN("stsd size remain %zu", m_m4aHdr.sizeof_stsd); }
+        if (atom_struct) { AUDIO_LOGF_WARN("stsd size remain {}", m_m4aHdr.sizeof_stsd); }
         if (m_m4aHdr.sizeof_stsd == 0) {
             m_controlCounter = M4A_STBL;
             return 0;
@@ -2728,7 +2728,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         m_m4aHdr.sizeof_stsd -= atom_size.to_uint32(16);
 
         if (atom_name.equals("mp4a")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             m_m4aHdr.sizeof_mp4a = atom_size.to_uint32(16) - 8;
             m_m4aHdr.retvalue += 8;
             m_m4aHdr.headerSize += 8;
@@ -2737,19 +2737,19 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         }
 
         if (atom_name.equals("alac")) {
-            AUDIO_LOG_ERROR("Apple loseless audio codec (ALAC) not supported");
+            AUDIO_LOGF_ERROR("Apple loseless audio codec (ALAC) not supported");
             stopSong();
             return 0;
         }
 
         if (atom_name.equals("ac-3")) {
-            AUDIO_LOG_ERROR("Dolby Digital not supported");
+            AUDIO_LOGF_ERROR("Dolby Digital not supported");
             stopSong();
             return 0;
         }
 
         if (atom_name.equals("ec-3")) {
-            AUDIO_LOG_ERROR("Dolby Digital Plud not supported");
+            AUDIO_LOGF_ERROR("Dolby Digital Plud not supported");
             stopSong();
             return 0;
         }
@@ -2766,14 +2766,14 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             return 0;
         }
 
-        if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+        if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
         m_m4aHdr.retvalue += atom_size.to_uint32(16);
         m_m4aHdr.headerSize += atom_size.to_uint32(16);
         return 0;
     }
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_controlCounter == M4A_CHPL) {
-        if (atom_struct) { AUDIO_LOG_WARN("chpl size remain %zu", m_m4aHdr.sizeof_chpl); }
+        if (atom_struct) { AUDIO_LOGF_WARN("chpl size remain {}", m_m4aHdr.sizeof_chpl); }
         if (m_m4aHdr.sizeof_chpl == 0) {
             m_controlCounter = M4A_UDTA;
             return 0;
@@ -2797,7 +2797,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
     }
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_controlCounter == M4A_MP4A) {
-        if (atom_struct) { AUDIO_LOG_WARN("mp4a size remain %zu", m_m4aHdr.sizeof_mp4a); }
+        if (atom_struct) { AUDIO_LOGF_WARN("mp4a size remain {}", m_m4aHdr.sizeof_mp4a); }
         if (m_m4aHdr.sizeof_mp4a == 0) {
             m_controlCounter = M4A_STSD;
             return 0;
@@ -2808,12 +2808,12 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             // data[6] & [7] Data reference buffer_index
             // data[8]...[15] reserved
             m_m4aHdr.channel_count = data[16] * 256 + data[17];
-            AUDIO_LOG_DEBUG("channels %u", m_m4aHdr.channel_count);
+            AUDIO_LOGF_DEBUG("channels {}", m_m4aHdr.channel_count);
             m_m4aHdr.sample_size = data[18] * 256 + data[19];
-            AUDIO_LOG_DEBUG("bit per sample %u", m_m4aHdr.sample_size);
+            AUDIO_LOGF_DEBUG("bit per sample {}", m_m4aHdr.sample_size);
             // data[20]...data[23] reserved
             m_m4aHdr.sample_rate = data[24] * 256 + data[25];
-            AUDIO_LOG_DEBUG("sample rate %u", m_m4aHdr.sample_rate);
+            AUDIO_LOGF_DEBUG("sample rate {}", m_m4aHdr.sample_rate);
             // data[26]...data[27] sample rate fixed point is 0x00, 0x00
             m_m4aHdr.offset = 28;
             m_m4aHdr.retvalue += m_m4aHdr.offset;
@@ -2826,7 +2826,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         m_m4aHdr.sizeof_mp4a -= atom_size.to_uint32(16);
 
         if (atom_name.equals("esds")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             m_m4aHdr.sizeof_esds = atom_size.to_uint32(16) - 8;
             m_m4aHdr.retvalue += 8;
             m_m4aHdr.headerSize += 8;
@@ -2834,14 +2834,14 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             return 0;
         }
 
-        if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+        if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
         m_m4aHdr.retvalue += atom_size.to_uint32(16);
         m_m4aHdr.headerSize += atom_size.to_uint32(16);
         return 0;
     }
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_controlCounter == M4A_UDTA) { // udta
-        if (atom_struct) { AUDIO_LOG_WARN("udta size remain %zu", m_m4aHdr.sizeof_udta); }
+        if (atom_struct) { AUDIO_LOGF_WARN("udta size remain {}", m_m4aHdr.sizeof_udta); }
         if (m_m4aHdr.sizeof_udta == 0) {
             m_controlCounter = M4A_MOOV;
             return 0;
@@ -2852,7 +2852,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         m_m4aHdr.sizeof_udta -= atom_size.to_uint32(16);
 
         if (atom_name.equals("meta")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             m_m4aHdr.sizeof_meta = atom_size.to_uint32(16) - 8;
             m_m4aHdr.retvalue += 8;
             m_m4aHdr.headerSize += 8;
@@ -2861,7 +2861,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         }
 
         if (atom_name.equals("chpl")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             m_m4aHdr.sizeof_chpl = atom_size.to_uint32(16) - 8;
             m_m4aHdr.retvalue += 8;
             m_m4aHdr.headerSize += 8;
@@ -2869,14 +2869,14 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             return 0;
         }
 
-        if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+        if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
         m_m4aHdr.retvalue += atom_size.to_uint32(16);
         m_m4aHdr.headerSize += atom_size.to_uint32(16);
         return 0;
     }
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     if (m_controlCounter == M4A_META) { // meta
-        if (atom_struct) { AUDIO_LOG_WARN("meta size remain %zu", m_m4aHdr.sizeof_meta); }
+        if (atom_struct) { AUDIO_LOGF_WARN("meta size remain {}", m_m4aHdr.sizeof_meta); }
         if (m_m4aHdr.sizeof_meta == 0) {
             m_controlCounter = M4A_UDTA;
             return 0;
@@ -2896,7 +2896,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         m_m4aHdr.sizeof_meta -= atom_size.to_uint32(16);
 
         if (atom_name.equals("ilst")) {
-            if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+            if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
             m_m4aHdr.sizeof_ilst = atom_size.to_uint32(16) - 8;
             m_m4aHdr.retvalue += 8;
             m_m4aHdr.headerSize += 8;
@@ -2904,7 +2904,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             return 0;
         }
 
-        if (atom_struct) { AUDIO_LOG_WARN("atom %s @ %zu, size: %u, ends @ %zu", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
+        if (atom_struct) { AUDIO_LOGF_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.headerSize, atom_size.to_uint32(16), m_m4aHdr.headerSize + atom_size.to_uint32(16)); }
         m_m4aHdr.retvalue += atom_size.to_uint32(16);
         m_m4aHdr.headerSize += atom_size.to_uint32(16);
         return 0;
@@ -2931,7 +2931,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         int32_t dec_specific_offset = esds_buffer.special_index_of("\x05\x80\x80\x80", 4, m_m4aHdr.sizeof_esds);
         if (dec_specific_offset >= 0) {                                                           // decoderSpecificInfo found
             uint8_t dec_specific_length = ((uint8_t*)esds_buffer.get())[dec_specific_offset + 4]; // Länge nach Tag + 3 Extended Length Bytes
-            AUDIO_LOG_DEBUG("DecoderSpecificInfo found at offset %d, length: %u", dec_specific_offset, dec_specific_length);
+            AUDIO_LOGF_DEBUG("DecoderSpecificInfo found at offset {}, length: {}", dec_specific_offset, dec_specific_length);
 
             // extract decoderSpecificInfo-data
             ps_ptr<char> dec_specific_data;
@@ -2939,11 +2939,11 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             memcpy(dec_specific_data.get(), (uint8_t*)esds_buffer.get() + dec_specific_offset + 5, dec_specific_length);
             m_m4aHdr.aac_profile = (uint8_t)dec_specific_data.get()[0] >> 3;
             if (m_m4aHdr.aac_profile > 4) {
-                AUDIO_LOG_ERROR("unsupported AAC Profile %i", m_m4aHdr.aac_profile);
+                AUDIO_LOGF_ERROR("unsupported AAC Profile {}", m_m4aHdr.aac_profile);
                 stopSong();
                 return 0;
             }
-            AUDIO_LOG_DEBUG("DecoderSpecificInfo data: 0x%02X 0x%02X", (uint8_t)dec_specific_data.get()[0], (uint8_t)dec_specific_data.get()[1]);
+            AUDIO_LOGF_DEBUG("DecoderSpecificInfo data: 0x{} 0x{}", (uint8_t)dec_specific_data.get()[0], (uint8_t)dec_specific_data.get()[1]);
             char profile[5][33] = {"unknown", "AAC Main", "AAC LC (Low Complexity)", "AAC SSR (Scalable Sample Rate)", "AAC LTP (Long Term Prediction)"};
             info(*this, evt_info, "AAC Profile: %s", profile[m_m4aHdr.aac_profile]);
             info(*this, evt_info, "AAC Channels; %i", m_m4aHdr.channel_count);
@@ -2953,7 +2953,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             m_M4A_sampleRate = m_m4aHdr.sample_rate;
             m_M4A_objectType = m_m4aHdr.aac_profile;
         } else {
-            AUDIO_LOG_WARN("No DecoderSpecificInfo found in esds");
+            AUDIO_LOGF_WARN("No DecoderSpecificInfo found in esds");
         }
         m_m4aHdr.retvalue += m_m4aHdr.sizeof_esds;
         m_m4aHdr.headerSize += m_m4aHdr.sizeof_esds;
@@ -2995,7 +2995,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             atom_size.big_endian(data + consumed, 4);
             atom_name.copy_from((const char*)data + 4 + consumed, 4);
             uint32_t as = atom_size.to_uint32(16);
-            AUDIO_LOG_DEBUG("atom %s @ %u, size: %u, ends @ %u", atom_name.c_get(), pos, as, pos + as);
+            AUDIO_LOGF_DEBUG("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), pos, as, pos + as);
             m_m4aHdr.ilst_pos += as;
             pos += as;
             consumed += as;
@@ -3020,7 +3020,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
                             if (strcmp(san, "covr") == 0) {
                                 m_m4aHdr.picLen = as - 24;
                                 m_m4aHdr.picPos = pos + 24 - as;
-                                AUDIO_LOG_DEBUG("cover jpeg start: %u, len %u", m_m4aHdr.picPos, m_m4aHdr.picLen);
+                                AUDIO_LOGF_DEBUG("cover jpeg start: {}, len {}", m_m4aHdr.picPos, m_m4aHdr.picLen);
                             }
                             id3tag.assignf("%s: %i", tags[i].descr, &sa[24]); // binary
                         } else if (dty == 1 && strlen(&sa[24]) > 0)
@@ -3028,12 +3028,12 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
                         else if (dty == 0x0D) {
                             m_m4aHdr.picLen = as - 24;
                             m_m4aHdr.picPos = pos + 24 - as;
-                            AUDIO_LOG_DEBUG("cover jpeg start: %u, len %u", m_m4aHdr.picPos, m_m4aHdr.picLen);
+                            AUDIO_LOGF_DEBUG("cover jpeg start: {}, len {}", m_m4aHdr.picPos, m_m4aHdr.picLen);
                         } // jpeg
                         else if (dty == 0x0E) {
                             m_m4aHdr.picLen = as - 24;
                             m_m4aHdr.picPos = pos + 24 - as;
-                            AUDIO_LOG_WARN("cover png start: %u, len %u", m_m4aHdr.picPos, m_m4aHdr.picLen);
+                            AUDIO_LOGF_WARN("cover png start: {}, len {}", m_m4aHdr.picPos, m_m4aHdr.picLen);
                         } // png
                         else if (dty == 21) {
                             if (memcmp(tags[i].tag, "cpil", 4) == 0) { break; } // Compilation Flag
@@ -3046,7 +3046,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
                     }
                 }
             } else
-                AUDIO_LOG_DEBUG("%s tag not supported", san);
+                AUDIO_LOGF_DEBUG("{} tag not supported", san);
 
             if (consumed > len + m_m4aHdr.ilst_already_consumed) { // ILST > len can happen
                 m_m4aHdr.ilst_already_consumed += len;
@@ -3164,7 +3164,7 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         return 0;
     }
     // this section should never be reached
-    AUDIO_LOG_ERROR("error");
+    AUDIO_LOGF_ERROR("error");
     return 0;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -3178,7 +3178,7 @@ size_t Audio::process_m3u8_ID3_Header(uint8_t* packet) {
     (void)current_timestamp; // suppress -Wunused-variable
 
     if (specialIndexOf(packet, "ID3", 4) != 0) { // ID3 not found
-        // AUDIO_LOG_INFO("m3u8 file has no mp3 tag");
+        // AUDIO_LOGF_INFO("m3u8 file has no mp3 tag");
         return 0; // error, no ID3 signature found
     }
     ID3version = *(packet + 3);
@@ -3195,17 +3195,17 @@ size_t Audio::process_m3u8_ID3_Header(uint8_t* packet) {
     };
     id3Size = bigEndian(&packet[6], 4, 7); //  ID3v2 size  4 * %0xxxxxxx (shift left seven times!!)
     id3Size += 10;
-    // AUDIO_LOG_INFO("ID3 framesSize: %i", id3Size);
-    // AUDIO_LOG_INFO("ID3 version: 2.%i", ID3version);
+    // AUDIO_LOGF_INFO("ID3 framesSize: {}", id3Size);
+    // AUDIO_LOGF_INFO("ID3 version: 2.{}", ID3version);
 
     if (m_f_exthdr) {
-        AUDIO_LOG_ERROR("ID3 extended header in m3u8 files not supported");
+        AUDIO_LOGF_ERROR("ID3 extended header in m3u8 files not supported");
         return 0;
     }
-    // AUDIO_LOG_INFO("ID3 normal frames");
+    // AUDIO_LOGF_INFO("ID3 normal frames");
 
     if (specialIndexOf(&packet[10], "PRIV", 5) != 0) { // tag PRIV not found
-        AUDIO_LOG_ERROR("tag PRIV in m3u8 Id3 Header not found");
+        AUDIO_LOGF_ERROR("tag PRIV in m3u8 Id3 Header not found");
         return 0;
     }
     // if tag PRIV exists assume content is "com.apple.streaming.transportStreamTimestamp"
@@ -3436,7 +3436,7 @@ i2swrite:
     // static uint32_t t = millis();
 
     // if(t + 10000 < millis()){
-    //     AUDIO_LOG_INFO("%i", cnt);
+    //     AUDIO_LOGF_INFO("{}", cnt);
     //     cnt = 0;
     //     t = millis();
     // }
@@ -3448,13 +3448,13 @@ exit:
     if (m_plCh.err == ESP_OK)
         return;
     else if (m_plCh.err == ESP_ERR_INVALID_ARG)
-        AUDIO_LOG_ERROR("NULL pointer or this handle is not tx handle");
+        AUDIO_LOGF_ERROR("NULL pointer or this handle is not tx handle");
     else if (m_plCh.err == ESP_ERR_TIMEOUT)
-        AUDIO_LOG_ERROR("Writing timeout, no writing event received from ISR within ticks_to_wait");
+        AUDIO_LOGF_ERROR("Writing timeout, no writing event received from ISR within ticks_to_wait");
     else if (m_plCh.err == ESP_ERR_INVALID_STATE)
-        AUDIO_LOG_ERROR("I2S is not ready to write");
+        AUDIO_LOGF_ERROR("I2S is not ready to write");
     else
-        AUDIO_LOG_ERROR("i2s err %i", m_plCh.err);
+        AUDIO_LOGF_ERROR("i2s err {}", m_plCh.err);
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 void Audio::loop() {
@@ -3574,7 +3574,7 @@ bool Audio::readPlayListData() {
         while (!m_client->available()) {
             vTaskDelay(2);
             if (t + 1000 < millis()) {
-                AUDIO_LOG_WARN("Playlist is incomplete, fetch again");
+                AUDIO_LOGF_WARN("Playlist is incomplete, fetch again");
                 if (m_f_chunked) getChunkSize(0, true);
                 return true;
             }
@@ -3583,7 +3583,7 @@ bool Audio::readPlayListData() {
     };
 
     if (m_dataMode != AUDIO_PLAYLISTINIT) {
-        AUDIO_LOG_ERROR("wrong datamode %s", dataModeStr[m_dataMode]);
+        AUDIO_LOGF_ERROR("wrong datamode {}", dataModeStr[m_dataMode]);
         goto exit;
     }
 
@@ -3597,7 +3597,7 @@ bool Audio::readPlayListData() {
     }
 
     // delete all memory in m_playlistContent
-    if (m_playlistFormat == FORMAT_M3U8 && !psramFound()) { AUDIO_LOG_ERROR("m3u8 playlists requires PSRAM enabled!"); }
+    if (m_playlistFormat == FORMAT_M3U8 && !psramFound()) { AUDIO_LOGF_ERROR("m3u8 playlists requires PSRAM enabled!"); }
     vector_clear_and_shrink(m_playlistContent);
 
     while (true) { // outer while
@@ -3641,16 +3641,16 @@ bool Audio::readPlayListData() {
             if (ctl == plSize) break;
             if (detectTimeout()) goto exit;
         } // inner while
-        AUDIO_LOG_DEBUG("PL: %s", pl.c_get());
+        AUDIO_LOGF_DEBUG("PL: {}", pl.c_get());
         if (pl.starts_with_icase("<!DOCTYPE")) {
-            AUDIO_LOG_WARN("url is a webpage!");
+            AUDIO_LOGF_WARN("url is a webpage!");
             goto exit;
         }
         if (pl.starts_with_icase("<html")) {
-            AUDIO_LOG_WARN("url is a webpage!");
+            AUDIO_LOGF_WARN("url is a webpage!");
             goto exit;
         }
-        // AUDIO_LOG_INFO("current playlist line: %s", pl.get());
+        // AUDIO_LOGF_INFO("current playlist line: {}", pl.get());
         if (pl.size() > 0) m_playlistContent.emplace_back(std::move(pl));
 
         // termination conditions
@@ -3692,14 +3692,14 @@ const char* Audio::parsePlaylist_M3U() {
 
         pos = m_playlistContent[i].index_of("http://:@", 0); // ":@"??  remove that!
         if (pos >= 0) {
-            AUDIO_LOG_INFO("Entry in playlist found: %s", (m_playlistContent[i].get() + pos + 9));
+            AUDIO_LOGF_INFO("Entry in playlist found: {}", (m_playlistContent[i].get() + pos + 9));
             host = m_playlistContent[i].get() + pos + 9;
             break;
         }
-        // AUDIO_LOG_INFO("Entry in playlist found: %s", pl);
+        // AUDIO_LOGF_INFO("Entry in playlist found: {}", pl);
         pos = m_playlistContent[i].index_of("http", 0); // Search for "http"
         if (pos >= 0) {                                 // Does URL contain "http://"?
-                                                        //    AUDIO_LOG_ERROR(""%s pos=%i", m_playlistContent[i], pos);
+                                                        //    AUDIO_LOGF_ERROR("{} pos={}", m_playlistContent[i], pos);
             host = m_playlistContent[i].get() + pos;    // Yes, set new host
             break;
         }
@@ -3718,7 +3718,7 @@ const char* Audio::parsePlaylist_PLS() {
             if (m_playlistContent[0].strlen() == 0) goto exit;     // empty line
             if (!m_playlistContent[0].starts_with("[playlist]")) { // first entry in valid pls
                 m_dataMode = HTTP_RESPONSE_HEADER;                 // pls is not valid
-                AUDIO_LOG_INFO("Playlist is not valid, switch to HTTP_RESPONSE_HEADER");
+                AUDIO_LOGF_INFO("Playlist is not valid, switch to HTTP_RESPONSE_HEADER");
                 goto exit;
             }
             continue;
@@ -3841,15 +3841,15 @@ int16_t Audio::prepare_first_m3u8_url(ps_ptr<char>& playlistBuff) {
         if (playlistBuff.equals(m_linesWithURL[i].get())) idx = i;
     }
     if (idx == -1) {
-        AUDIO_LOG_DEBUG("nothing found, all entries are new");
+        AUDIO_LOGF_DEBUG("nothing found, all entries are new");
         return 0;
     }
     if (idx == m_linesWithURL.size()) {
-        AUDIO_LOG_DEBUG("only last entry found, nothing is new");
+        AUDIO_LOGF_DEBUG("only last entry found, nothing is new");
         return -1;
     }
     for (int j = 0; j < idx + 1; j++) { m_linesWithURL.pop_front(); }
-    AUDIO_LOG_DEBUG("%i entries are known and removed", idx + 1);
+    AUDIO_LOGF_DEBUG("{} entries are known and removed", idx + 1);
     return idx + 1;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————-
@@ -3882,7 +3882,7 @@ ps_ptr<char> Audio::parsePlaylist_M3U8() {
     // https://hz71.streamabc.net/hls/d2gu4l4peavc72tgotd0/regc-90s90srock1436287-mp3-192-2191420/3.mp3
 
     if (!m_lastHost.valid()) {
-        AUDIO_LOG_ERROR("m_lastHost is NULL");
+        AUDIO_LOGF_ERROR("m_lastHost is NULL");
         return {};
     } // guard
 
@@ -3895,8 +3895,8 @@ ps_ptr<char> Audio::parsePlaylist_M3U8() {
         deque_clear_and_shrink(m_linesWithURL);
         vector_clear_and_shrink(m_linesWithEXTINF);
         for (uint8_t i = 0; i < lines; i++) {
-            // AUDIO_LOG_INFO("pl%i = %s", i, m_playlistContent[i].get());
-            if (m_playlistContent[i].starts_with("#EXT-X-STREAM-INF:")) { f_haveRedirection = true; /*AUDIO_LOG_ERROR("we have a redirection");*/ }
+            // AUDIO_LOGF_INFO("pl{} = {}", i, m_playlistContent[i].get());
+            if (m_playlistContent[i].starts_with("#EXT-X-STREAM-INF:")) { f_haveRedirection = true; /*AUDIO_LOGF_ERROR("we have a redirection");*/ }
             if (addNextLine) {
                 if (startsWith(m_playlistContent[i].get(), "#EXT-X-PROGRAM-DATE-TIME:")) continue; // skip this line
                 addNextLine = false;
@@ -3915,10 +3915,10 @@ ps_ptr<char> Audio::parsePlaylist_M3U8() {
         }
     }
 
-    for (int i = 0; i < m_linesWithURL.size(); i++) { /*AUDIO_LOG_INFO("%s", m_linesWithURL[i].get())*/
+    for (int i = 0; i < m_linesWithURL.size(); i++) { /*AUDIO_LOGF_INFO("{}", m_linesWithURL[i].get())*/
         ;
     }
-    for (int i = 0; i < m_linesWithEXTINF.size(); i++) { /*AUDIO_LOG_INFO("%s", m_linesWithEXTINF[i].get());*/
+    for (int i = 0; i < m_linesWithEXTINF.size(); i++) { /*AUDIO_LOGF_INFO("{}", m_linesWithEXTINF[i].get());*/
         showstreamtitle(m_linesWithEXTINF[i].get());
     }
 
@@ -3947,7 +3947,7 @@ ps_ptr<char> Audio::parsePlaylist_M3U8() {
             m_linesWithURL.pop_front();
             m_linesWithURL.shrink_to_fit();
         }
-        AUDIO_LOG_DEBUG("now playing %s", playlistBuff.get());
+        AUDIO_LOGF_DEBUG("now playing {}", playlistBuff.get());
         if (endsWith(playlistBuff.get(), "ts")) m_f_ts = true;
         if (playlistBuff.contains(".ts?") > 0) m_f_ts = true;
         m_playlistBuff.clone_from(playlistBuff);
@@ -3968,7 +3968,7 @@ ps_ptr<char> Audio::m3u8redirection(uint8_t* codec) {
     // 32/playlist.m3u8?hlssid=7562d0e101b84aeea0fa35f8b963a174
 
     if (!m_lastHost.valid()) {
-        AUDIO_LOG_ERROR("m_lastHost is empty");
+        AUDIO_LOGF_ERROR("m_lastHost is empty");
         return {};
     } // guard
     const char codecString[9][11] = {
@@ -4064,7 +4064,7 @@ void Audio::processLocalFile() {
 
     if (m_resumeFilePos >= 0) { // we have a resume file position
         m_prlf.newFilePos = newInBuffStart(m_resumeFilePos);
-        if (m_prlf.newFilePos < 0) AUDIO_LOG_WARN("skip to new position was not successful");
+        if (m_prlf.newFilePos < 0) AUDIO_LOGF_WARN("skip to new position was not successful");
         m_haveNewFilePos = m_prlf.newFilePos;
         m_audioDataReadPtr = m_prlf.newFilePos;
         m_resumeFilePos = -1;
@@ -4081,7 +4081,7 @@ void Audio::processLocalFile() {
     if (!m_audioDataSize && m_audioFilePosition == m_audioFileSize) {
         if (!m_f_allDataReceived) m_f_allDataReceived = true;
     }
-    // AUDIO_LOG_DEBUG("m_audioFilePosition %u >= m_audioDataSize %u, m_f_allDataReceived % i", m_audioFilePosition, m_audioDataSize, m_f_allDataReceived);
+    // AUDIO_LOGF_DEBUG("m_audioFilePosition {} >= m_audioDataSize {}, m_f_allDataReceived {}", m_audioFilePosition, m_audioDataSize, m_f_allDataReceived);
 
     if (!m_decoder && InBuff.bufferFilled() > 127) {
         if (!initializeDecoder()) return;
@@ -4092,7 +4092,7 @@ void Audio::processLocalFile() {
         if (m_controlCounter != 100) {
             if (m_f_ogg) { m_controlCounter = 100; }
             if ((millis() - m_prlf.ctime) > m_prlf.timeout) {
-                AUDIO_LOG_ERROR("audioHeader reading timeout");
+                AUDIO_LOGF_ERROR("audioHeader reading timeout");
                 m_f_running = false;
                 goto exit;
             }
@@ -4232,7 +4232,7 @@ void Audio::processWebStream() {
 void Audio::processWebFile() {
 
     if (!m_lastHost.valid()) {
-        AUDIO_LOG_ERROR("m_lastHost is empty");
+        AUDIO_LOGF_ERROR("m_lastHost is empty");
         return;
     } // guard
     uint32_t availableBytes = 0;
@@ -4257,7 +4257,7 @@ void Audio::processWebFile() {
 
     if (m_resumeFilePos >= 0) { // we have a resume file position
         m_pwf.newFilePos = newInBuffStart(m_resumeFilePos);
-        if (m_pwf.newFilePos < 0) AUDIO_LOG_WARN("skip to new position was not successful");
+        if (m_pwf.newFilePos < 0) AUDIO_LOGF_WARN("skip to new position was not successful");
         m_haveNewFilePos = m_pwf.newFilePos;
         m_audioDataReadPtr = m_pwf.newFilePos;
         m_resumeFilePos = -1;
@@ -4274,7 +4274,7 @@ void Audio::processWebFile() {
     if (!m_audioDataSize && m_audioFilePosition == m_audioFileSize) {
         if (!m_f_allDataReceived) m_f_allDataReceived = true;
     }
-    // AUDIO_LOG_ERROR("m_audioFilePosition %u >= m_audioDataSize %u, m_f_allDataReceived % i", m_audioFilePosition, m_audioDataSize, m_f_allDataReceived);
+    // AUDIO_LOGF_ERROR("m_audioFilePosition {} >= m_audioDataSize {}, m_f_allDataReceived {}", m_audioFilePosition, m_audioDataSize, m_f_allDataReceived);
     if (!m_decoder && InBuff.bufferFilled() > 127) {
         if (!initializeDecoder()) return;
     }
@@ -4283,7 +4283,7 @@ void Audio::processWebFile() {
         if (m_controlCounter != 100) {
             if (m_f_ogg) { m_controlCounter = 100; }
             if ((millis() - m_pwf.ctime) > m_pwf.timeout) {
-                AUDIO_LOG_ERROR("audioHeader reading timeout");
+                AUDIO_LOGF_ERROR("audioHeader reading timeout");
                 m_f_running = false;
                 goto exit;
             }
@@ -4368,7 +4368,7 @@ nextRound:
             int cs = getChunkSize(&readedBytes);
             if (cs == -1) return;
             m_pwsst.chunkSize += cs;
-            AUDIO_LOG_DEBUG("cs %u, rb %u", cs, readedBytes);
+            AUDIO_LOGF_DEBUG("cs {}, rb {}", cs, readedBytes);
             if (cs == 0) {
                 m_pwsst.f_chunkFinished = true;
                 m_pwsst.chunkSize = 0;
@@ -4391,7 +4391,7 @@ nextRound:
                 m_pwsst.f_firstPacket = false;
                 uint8_t ID3_HeaderSize = process_m3u8_ID3_Header(m_pwsst.ts_packet.get());
                 if (ID3_HeaderSize > m_pwsst.ts_packetsize) {
-                    AUDIO_LOG_ERROR("ID3 Header is too big");
+                    AUDIO_LOGF_ERROR("ID3 Header is too big");
                     stopSong();
                     return;
                 }
@@ -4403,7 +4403,7 @@ nextRound:
             }
             if (!ts_parsePacket(&m_pwsst.ts_packet.get()[0], &ts_packetStart, &ts_packetLength)) {
                 stopSong();
-                AUDIO_LOG_ERROR("song stopped");
+                AUDIO_LOGF_ERROR("song stopped");
                 return;
             };
 
@@ -4426,18 +4426,18 @@ nextRound:
                         t++;
                         vTaskDelay(10); // wait until the buffer is free
                         if (t == 10) {
-                            AUDIO_LOG_ERROR("InBuff is full");
+                            AUDIO_LOGF_ERROR("InBuff is full");
                             break;
                         }
                     }
                 }
             }
             if (m_audioFileSize && m_pwsst.byteCounter > m_audioFileSize) {
-                AUDIO_LOG_ERROR("byteCounter overflow, byteCounter: %u, contentlength: %u", m_pwsst.byteCounter, m_audioFileSize);
+                AUDIO_LOGF_ERROR("byteCounter overflow, byteCounter: {}, contentlength: {}", m_pwsst.byteCounter, m_audioFileSize);
                 return;
             }
             if (m_pwsst.chunkSize && m_pwsst.byteCounter > m_pwsst.chunkSize) {
-                AUDIO_LOG_ERROR("byteCounter overflow, byteCounter: %u, chunkSize: %zu", m_pwsst.byteCounter, m_pwsst.chunkSize);
+                AUDIO_LOGF_ERROR("byteCounter overflow, byteCounter: {}, chunkSize: {}", m_pwsst.byteCounter, m_pwsst.chunkSize);
                 return;
             }
         }
@@ -4526,7 +4526,7 @@ void Audio::processWebStreamHLS() {
                 int res = read_ID3_Header(&m_pwsHLS.ID3Buff[m_pwsHLS.ID3ReadPtr], m_pwsHLS.ID3BuffSize - m_pwsHLS.ID3ReadPtr);
                 if (res >= 0) m_pwsHLS.ID3ReadPtr += res;
                 if (m_pwsHLS.ID3ReadPtr > m_pwsHLS.ID3BuffSize) {
-                    AUDIO_LOG_ERROR("buffer overflow");
+                    AUDIO_LOGF_ERROR("buffer overflow");
                     stopSong();
                     return;
                 }
@@ -4551,7 +4551,7 @@ void Audio::processWebStreamHLS() {
                     t++;
                     vTaskDelay(10); // wait until the buffer is free
                     if (t == 10) {
-                        AUDIO_LOG_ERROR("InBuff is full");
+                        AUDIO_LOGF_ERROR("InBuff is full");
                         break;
                     }
                 }
@@ -4685,7 +4685,7 @@ void Audio::playAudioData() {
 exit:
     xSemaphoreGive(mutex_audioTaskIsDecoding);
 
-    AUDIO_LOG_DEBUG("m_audioDataReadPtr %u, m_audioDataSize %zu", m_audioDataReadPtr, m_audioDataSize);
+    AUDIO_LOGF_DEBUG("m_audioDataReadPtr {}, m_audioDataSize {}", m_audioDataReadPtr, m_audioDataSize);
     return;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -4704,12 +4704,12 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
         if (m_httpRespHdrBuff.ends_with("\r\n\r\n")) break;
         if (m_httpRespHdrBuff.ends_with("\n\n")) break;
         if (pos == m_httpRespHdrBuff.size()) {
-            AUDIO_LOG_WARN("responseHeaderline overflow");
+            AUDIO_LOGF_WARN("responseHeaderline overflow");
             m_httpRespHdrBuff[pos - 1] = '\0';
             break;
         }
         if ((millis() - m_phreh.ctime) > m_phreh.timeout) {
-            AUDIO_LOG_ERROR("timeout");
+            AUDIO_LOGF_ERROR("timeout");
             m_phreh.f_time = false;
             stopSong();
             return false;
@@ -4751,7 +4751,7 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
             int sc = atoi(statusCode);
             if (sc == 403 && !m_f_alt_user_agent) { // HTTP/1.1 403 Forbidden
                 m_f_alt_user_agent = true;
-                AUDIO_LOG_WARN("403 Forbidden, test alternative user agent");
+                AUDIO_LOGF_WARN("403 Forbidden, test alternative user agent");
                 connecttohost(m_lastHost.c_get());
                 return true;
             }
@@ -4766,7 +4766,7 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
             if (parseContentType(rhl.get() + 13))
                 ct_seen = true;
             else {
-                AUDIO_LOG_WARN("unknown contentType %s", rhl.get() + 13);
+                AUDIO_LOGF_WARN("unknown contentType {}", rhl.get() + 13);
                 goto exit;
             }
         }
@@ -4800,14 +4800,14 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
                     return true;
                 }
             } else {
-                AUDIO_LOG_WARN("unknown redirection: %s", rhl.c_get());
+                AUDIO_LOGF_WARN("unknown redirection: {}", rhl.c_get());
             }
         }
 
         else if (rhl.starts_with_icase("content-encoding:")) {
             info(*this, evt_info, "%s", rhl.get());
             if (rhl.contains("gzip")) {
-                AUDIO_LOG_ERROR("can't extract gzip");
+                AUDIO_LOGF_ERROR("can't extract gzip");
                 goto exit;
             }
         }
@@ -4821,7 +4821,7 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
                 info(*this, evt_info, "Filename is %s", fn.get());
             }
         } else if (rhl.starts_with_icase("connection:")) {
-            if (rhl.contains_with_icase("close")) { m_f_connectionClose = true; /* AUDIO_LOG_ERROR("connection will be closed"); */ } // ends after ogg last Page is set
+            if (rhl.contains_with_icase("close")) { m_f_connectionClose = true; /* AUDIO_LOGF_ERROR("connection will be closed"); */ } // ends after ogg last Page is set
         }
 
         else if (rhl.starts_with_icase("icy-genre:")) {
@@ -4860,7 +4860,7 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
         }
 
         else if (rhl.starts_with_icase("icy-name:")) {
-            //  AUDIO_LOG_INFO("%s", rhl.get());
+            //  AUDIO_LOGF_INFO("{}", rhl.get());
             ps_ptr<char> icyName;
             icyName.assign(rhl.get() + 9); // Get station name
             icyName.trim();
@@ -4879,7 +4879,7 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
             while (c_idesc[0] == ' ') c_idesc++;
             latinToUTF8(rhl); // if already UTF-8 do nothing, otherwise convert to UTF-8
             if (strlen(c_idesc) > 0 && specialIndexOf((uint8_t*)c_idesc, "24bit", 0) > 0) {
-                AUDIO_LOG_INFO("icy-description: %s has to be 8 or 16", c_idesc);
+                AUDIO_LOGF_INFO("icy-description: {} has to be 8 or 16", c_idesc);
                 stopSong();
             }
             info(*this, evt_icydescription, "%s", c_idesc);
@@ -4895,11 +4895,11 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
 
         else if (rhl.starts_with_icase("accept-ranges:")) {
             if (rhl.ends_with_icase("bytes")) m_f_acceptRanges = true;
-            //    AUDIO_LOG_INFO("%s", rhl.c_get());
+            //    AUDIO_LOGF_INFO("{}", rhl.c_get());
         }
 
         else if (rhl.starts_with_icase("content-range:")) {
-            AUDIO_LOG_INFO("%s", rhl.c_get());
+            AUDIO_LOGF_INFO("{}", rhl.c_get());
         }
 
         else if (rhl.starts_with_icase("icy-url:")) {
@@ -4909,7 +4909,7 @@ bool Audio::parseHttpResponseHeader() { // this is the response to a GET / reque
         }
 
         else if (rhl.starts_with_icase("www-authenticate:")) {
-            AUDIO_LOG_WARN("authentification failed, wrong credentials?");
+            AUDIO_LOGF_WARN("authentification failed, wrong credentials?");
             goto exit;
         } else {
             ;
@@ -4937,13 +4937,13 @@ lastToDo:
 
     } else if (m_playlistFormat != FORMAT_NONE) {
         m_dataMode = AUDIO_PLAYLISTINIT; // playlist expected
-        // AUDIO_LOG_INFO("now parse playlist");
+        // AUDIO_LOGF_INFO("now parse playlist");
     } else {
-        AUDIO_LOG_INFO("unknown content found at: %s", m_currentHost.c_get());
+        AUDIO_LOGF_INFO("unknown content found at: {}", m_currentHost.c_get());
         goto exit;
     }
 
-    AUDIO_LOG_DEBUG("playlistFormat %s, dataMode %s, streamType: %s", plsFmtStr[m_playlistFormat], dataModeStr[m_dataMode], streamTypeStr[m_streamType]);
+    AUDIO_LOGF_DEBUG("playlistFormat {}, dataMode {}, streamType: {}", plsFmtStr[m_playlistFormat], dataModeStr[m_dataMode], streamTypeStr[m_streamType]);
     return true;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -4954,7 +4954,7 @@ bool Audio::parseHttpRangeHeader() { // this is the response to a Range request
     bool ct_seen = false;
 
     if (m_dataMode != HTTP_RANGE_HEADER) {
-        AUDIO_LOG_ERROR("wrong datamode %u", m_dataMode);
+        AUDIO_LOGF_ERROR("wrong datamode {}", m_dataMode);
         goto exit;
     }
 
@@ -4967,7 +4967,7 @@ bool Audio::parseHttpRangeHeader() { // this is the response to a Range request
             m_phrah.f_time = true;
         }
         if ((millis() - m_phrah.stime) > m_phrah.timeout) {
-            AUDIO_LOG_ERROR("timeout");
+            AUDIO_LOGF_ERROR("timeout");
             m_phrah.f_time = false;
             return false;
         }
@@ -4979,7 +4979,7 @@ bool Audio::parseHttpRangeHeader() { // this is the response to a Range request
     while (true) { // outer while
         uint16_t pos = 0;
         if ((millis() - m_phrah.ctime) > m_phrah.timeout) {
-            AUDIO_LOG_ERROR("timeout");
+            AUDIO_LOGF_ERROR("timeout");
             m_f_timeout = true;
             goto exit;
         }
@@ -5001,14 +5001,14 @@ bool Audio::parseHttpRangeHeader() { // this is the response to a Range request
             }
             if (pos == 1022) {
                 rhl[pos] = '\0';
-                AUDIO_LOG_WARN("responseHeaderline overflow");
+                AUDIO_LOGF_WARN("responseHeaderline overflow");
             }
         } // inner while
         if (!pos) {
             vTaskDelay(5);
             continue;
         }
-        // AUDIO_LOG_WARN("rh %s", rhl.c_get());
+        // AUDIO_LOGF_WARN("rh {}", rhl.c_get());
         if (rhl.starts_with_icase("HTTP/")) { // HTTP status error code
             char statusCode[5];
             statusCode[0] = rhl[9];
@@ -5039,7 +5039,7 @@ lastToDo:
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 bool Audio::initializeDecoder() {
     if (m_decoder) {
-        AUDIO_LOG_WARN("stopSong first");
+        AUDIO_LOGF_WARN("stopSong first");
         return true;
     }
     m_codec = determineCodec(m_codec); // OGG cn be VORBIS, FLAC or OPUS, contentType must not always be correct
@@ -5075,7 +5075,7 @@ bool Audio::initializeDecoder() {
             InBuff.setMaxBlocksize(m_frameSizeWav);
             break;
         default:
-            AUDIO_LOG_ERROR("unknown decoder");
+            AUDIO_LOGF_ERROR("unknown decoder");
             stopSong();
             return false;
             break;
@@ -5084,7 +5084,7 @@ bool Audio::initializeDecoder() {
     if (type) {
         m_decoder = createDecoder(type);
         if (!m_decoder || !m_decoder->init()) {
-            AUDIO_LOG_ERROR("The %sDecoder could not be initialized", type);
+            AUDIO_LOGF_ERROR("The {}Decoder could not be initialized", type);
             stopSong();
             return false;
         }
@@ -5161,7 +5161,7 @@ bool Audio::parseContentType(char* ct) {
 
     // exam for invalid content types
     if (ct_val == CT_NONE) {
-        AUDIO_LOG_WARN("ContentType %s not supported", ct);
+        AUDIO_LOGF_WARN("ContentType {} not supported", ct);
         return false;
     }
 
@@ -5196,7 +5196,7 @@ bool Audio::parseContentType(char* ct) {
             if (m_expectedPlsFmt == FORMAT_M3U8) m_playlistFormat = FORMAT_M3U8;
             if (m_expectedPlsFmt == FORMAT_PLS) m_playlistFormat = FORMAT_PLS;
             break;
-        default: AUDIO_LOG_ERROR("%s, unsupported audio format", ct); return false;
+        default: AUDIO_LOGF_ERROR("{}, unsupported audio format", ct); return false;
     }
 
     return true;
@@ -5373,7 +5373,7 @@ void Audio::showstreamtitle(char* st) {
         if (idx < 0) return;
         jsonIn.remove_before(idx + 10); // remove "result":
         jsonIn.truncate_at('"');        // remove after '"'    Ok","result":"Ok","errorCode":0} --> OK
-        // AUDIO_LOG_INFO("jsonIn: %s", jsonIn.c_get());
+        // AUDIO_LOGF_INFO("jsonIn: {}", jsonIn.c_get());
         m_streamTitle.unicodeToUTF8(jsonIn.c_get());
     }
 
@@ -5471,19 +5471,19 @@ void Audio::setDecoderItems() {
     if (m_lastGranulePosition && m_audioFileSize && m_i2s_items.sampleRate) {
         m_audioFileDuration = (uint32_t)(m_lastGranulePosition / m_i2s_items.sampleRate);
         m_nominal_bitrate = (m_audioFileSize - m_audioDataStart) * 8 / m_audioFileDuration;
-        AUDIO_LOG_DEBUG("m_nominal_bitrate %u, m_lastGranulePosition %llu", m_nominal_bitrate, (unsigned long long)m_lastGranulePosition);
+        AUDIO_LOGF_DEBUG("m_nominal_bitrate {}, m_lastGranulePosition {}", m_nominal_bitrate, (unsigned long long)m_lastGranulePosition);
         info(*this, evt_bitrate, "%i", m_nominal_bitrate);
         info(*this, evt_info, "Duration (s): %lu", m_audioFileDuration);
         info(*this, evt_info, "Bitrate (b/s): %lu", m_nominal_bitrate);
     }
 
     if (getBitsPerSample() != 8 && getBitsPerSample() != 16 && getBitsPerSample() != 24 && getBitsPerSample() != 32) {
-        AUDIO_LOG_ERROR("Bits per sample must be 8, 16, 24 or 32 found %i", getBitsPerSample());
+        AUDIO_LOGF_ERROR("Bits per sample must be 8, 16, 24 or 32 found {}", getBitsPerSample());
         stopSong();
     }
 
     if (getChannels() != 1 && getChannels() != 2) {
-        AUDIO_LOG_ERROR("Num of channels must be 1 or 2, found %i", getChannels());
+        AUDIO_LOGF_ERROR("Num of channels must be 1 or 2, found {}", getChannels());
         stopSong();
     }
     showCodecParams();
@@ -5530,7 +5530,7 @@ uint32_t Audio::decodeContinue(int8_t res, uint8_t* data, int32_t bytesDecoded, 
             uint32_t size = ((data[6 + bytesDecoded] & 0x7F) << 21) | ((data[7 + bytesDecoded] & 0x7F) << 14) | ((data[8 + bytesDecoded] & 0x7F) << 7) | (data[9 + bytesDecoded] & 0x7F);
             size += 10; // skip payload
             return bytesDecoded + size;
-            if (bytesDecoded > *bytesLeft) AUDIO_LOG_ERROR("AAC input data too small bytesDecoded %i,> bytesLeft %i", bytesDecoded, *bytesLeft);
+            if (bytesDecoded > *bytesLeft) AUDIO_LOGF_ERROR("AAC input data too small bytesDecoded {},> bytesLeft {}", bytesDecoded, *bytesLeft);
         }
     }
 
@@ -5623,10 +5623,10 @@ int Audio::sendBytes(uint8_t* data, size_t len) {
             if (st) { info(*this, evt_streamtitle, "%s", st); }
             vec = m_decoder->getMetadataBlockPicture();
             if (vec.size() > 0) { // get blockpic data
-                // AUDIO_LOG_INFO("---------------------------------------------------------------------------");
-                // AUDIO_LOG_INFO("ogg metadata blockpicture found:");
-                // for(int i = 0; i < vec.size(); i += 2) { AUDIO_LOG_INFO("segment %02i, pos %07i, len %05i", i / 2, vec[i], vec[i + 1]); }
-                // AUDIO_LOG_INFO("---------------------------------------------------------------------------");
+                // AUDIO_LOGF_INFO("---------------------------------------------------------------------------");
+                // AUDIO_LOGF_INFO("ogg metadata blockpicture found:");
+                // for(int i = 0; i < vec.size(); i += 2) { AUDIO_LOGF_INFO("segment {:02}, pos {:07}, len {:05}", i / 2, vec[i], vec[i + 1]); }
+                // AUDIO_LOGF_INFO("---------------------------------------------------------------------------");
                 info(*this, evt_image, vec);
             }
             break;
@@ -5636,10 +5636,10 @@ int Audio::sendBytes(uint8_t* data, size_t len) {
             if (st) { info(*this, evt_streamtitle, st); }
             vec = m_decoder->getMetadataBlockPicture();
             if (vec.size() > 0) { // get blockpic data
-                // AUDIO_LOG_INFO("---------------------------------------------------------------------------");
-                // AUDIO_LOG_INFO("ogg metadata blockpicture found:");
-                // for(int i = 0; i < vec.size(); i += 2) { AUDIO_LOG_INFO("segment %02i, pos %07i, len %05i", i / 2, vec[i], vec[i + 1]); }
-                // AUDIO_LOG_INFO("---------------------------------------------------------------------------");
+                // AUDIO_LOGF_INFO("---------------------------------------------------------------------------");
+                // AUDIO_LOGF_INFO("ogg metadata blockpicture found:");
+                // for(int i = 0; i < vec.size(); i += 2) { AUDIO_LOGF_INFO("segment {:02}, pos {:07}, len [:05}", i / 2, vec[i], vec[i + 1]); }
+                // AUDIO_LOGF_INFO("---------------------------------------------------------------------------");
                 info(*this, evt_image, vec);
             }
             if (m_decoder->arg1()) {
@@ -5656,10 +5656,10 @@ int Audio::sendBytes(uint8_t* data, size_t len) {
             if (st) { info(*this, evt_streamtitle, st); }
             vec = m_decoder->getMetadataBlockPicture();
             if (vec.size() > 0) { // get blockpic data
-                // AUDIO_LOG_INFO("---------------------------------------------------------------------------");
-                // AUDIO_LOG_INFO("ogg metadata blockpicture found:");
-                // for(int i = 0; i < vec.size(); i += 2) { AUDIO_LOG_INFO("segment %02i, pos %07i, len %05i", i / 2, vec[i], vec[i + 1]); }
-                // AUDIO_LOG_INFO("---------------------------------------------------------------------------");
+                // AUDIO_LOGF_INFO("---------------------------------------------------------------------------");
+                // AUDIO_LOGF_INFO("ogg metadata blockpicture found:");
+                // for(int i = 0; i < vec.size(); i += 2) { AUDIO_LOGF_INFO("segment {:02}, pos {:07}, len {:05}", i / 2, vec[i], vec[i + 1]); }
+                // AUDIO_LOGF_INFO("---------------------------------------------------------------------------");
                 info(*this, evt_image, vec);
             }
             break;
@@ -5759,7 +5759,7 @@ void Audio::calculateAudioTime(uint16_t bytesDecoderIn, uint16_t samples_decoder
     }
 
     if (m_syltLines.size()) {
-        //  AUDIO_LOG_INFO("%f", audioCurrentTime * 1000); // ms
+        //  AUDIO_LOGF_INFO("{}", audioCurrentTime * 1000); // ms
         if (m_cat.syltIdx >= m_syltLines.size()) return;
         if (m_audioCurrentTime * 1000 > m_syltTimeStamp[m_cat.syltIdx]) {
             info(*this, evt_lyrics, "%s", m_syltLines[m_cat.syltIdx].c_get());
@@ -5785,7 +5785,7 @@ bool Audio::i2s_config() {
     m_i2s_chan_cfg.intr_priority = 2;
     result = i2s_new_channel(&m_i2s_chan_cfg, &m_i2s_tx_handle, NULL);
     if (result != ESP_OK) { // ESP_ERR_INVALID_ARG?
-        AUDIO_LOG_ERROR("I2S channel: invalid argument");
+        AUDIO_LOGF_ERROR("I2S channel: invalid argument");
         return false;
     }
 
@@ -5804,8 +5804,8 @@ bool Audio::i2s_config() {
     m_i2s_std_cfg.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_256;
     result = i2s_channel_init_std_mode(m_i2s_tx_handle, &m_i2s_std_cfg);
     if (result != ESP_OK) {
-        if (result == ESP_ERR_INVALID_ARG) AUDIO_LOG_ERROR("invalid i2s configuration or i2s not standard mode");
-        if (result == ESP_ERR_INVALID_STATE) AUDIO_LOG_ERROR("This i2s channel is not initialized or not stopped");
+        if (result == ESP_ERR_INVALID_ARG) AUDIO_LOGF_ERROR("invalid i2s configuration or i2s not standard mode");
+        if (result == ESP_ERR_INVALID_STATE) AUDIO_LOGF_ERROR("This i2s channel is not initialized or not stopped");
         return false;
     }
     return true;
@@ -5823,14 +5823,14 @@ bool Audio::setPinout(uint8_t BCLK, uint8_t LRC, uint8_t DOUT, int8_t MCLK) {
     gpio_cfg.ws = (gpio_num_t)LRC;
 
 #if (ESP_ARDUINO_VERSION_MAJOR < 3)
-    AUDIO_LOG_ERROR("Arduino Version must be 3.0.0 or higher!");
+    AUDIO_LOGF_ERROR("Arduino Version must be 3.0.0 or higher!");
     result = false;
     goto exit;
 #endif
 
     m_f_psramFound = psramInit();
     if (!m_f_psramFound) {
-        AUDIO_LOG_ERROR("PSRAM not found");
+        AUDIO_LOGF_ERROR("PSRAM not found");
         result = false;
         goto exit;
     }
@@ -5859,7 +5859,7 @@ bool Audio::setPinout(uint8_t BCLK, uint8_t LRC, uint8_t DOUT, int8_t MCLK) {
     if (dsps_fft2r_init_fc32(nullptr, m_fft_items.SIZE) == ESP_OK) {
         m_fft_items.initialized = true;
     } else {
-        AUDIO_LOG_ERROR("FFT init failed (size=%d)", m_fft_items.SIZE);
+        AUDIO_LOGF_ERROR("FFT init failed (size={})", m_fft_items.SIZE);
         result = false;
         goto exit;
     }
@@ -5906,7 +5906,7 @@ uint32_t Audio::getAudioCurrentTime() { // return current time in seconds
 uint32_t Audio::getAudioFilePosition() {
     if (!m_f_stream) return 0;
     if ((m_dataMode != AUDIO_LOCALFILE) && (m_streamType != ST_WEBFILE)) {
-        AUDIO_LOG_WARN("audio is not a file");
+        AUDIO_LOGF_WARN("audio is not a file");
         return 0;
     }
     return m_audioFilePosition - inBufferFilled();
@@ -5915,19 +5915,19 @@ uint32_t Audio::getAudioFilePosition() {
 bool Audio::setAudioFilePosition(uint32_t pos) {
     if (!m_f_stream) return false;
     if ((m_dataMode != AUDIO_LOCALFILE) && (m_streamType != ST_WEBFILE)) {
-        AUDIO_LOG_WARN("audio is not a file");
+        AUDIO_LOGF_WARN("audio is not a file");
         return false;
     }
     if ((m_streamType == ST_WEBFILE) && (!m_f_acceptRanges)) {
-        AUDIO_LOG_WARN("server does not accept ranges");
+        AUDIO_LOGF_WARN("server does not accept ranges");
         return false;
     }
     if (pos > m_audioDataStart + m_audioDataSize) {
-        AUDIO_LOG_WARN("given position is too large");
+        AUDIO_LOGF_WARN("given position is too large");
         return false;
     }
     if (pos < m_audioDataStart) {
-        AUDIO_LOG_WARN("set audiodatastart at %u", m_audioDataStart);
+        AUDIO_LOGF_WARN("set audiodatastart at {}", m_audioDataStart);
         m_resumeFilePos = m_audioDataStart;
     }
     m_resumeFilePos = pos;
@@ -5956,7 +5956,7 @@ bool Audio::setAudioPlayTime(uint16_t sec) {
 bool Audio::setTimeOffset(int sec) { // fast forward or rewind the current position in seconds
     // info(*this, evt_info, "time offset %li sec", sec);
     if ((m_dataMode != AUDIO_LOCALFILE) && (m_streamType != ST_WEBFILE)) {
-        AUDIO_LOG_WARN("%s", "not a file");
+        AUDIO_LOGF_WARN("{}", "not a file");
         return false;
     } // guard
     if (!getBitRate()) return false; // guard
@@ -6056,7 +6056,7 @@ int32_t Audio::audioFileRead(uint8_t* buff, size_t len) {
                 if (readed_bytes <= 0) break;
             }
             if (t + 3000 < millis()) {
-                AUDIO_LOG_ERROR("timeout");
+                AUDIO_LOGF_ERROR("timeout");
                 res = -1;
                 break;
             }
@@ -6071,18 +6071,18 @@ int32_t Audio::audioFileSeek(uint32_t position, size_t len) {
     if (m_dataMode == AUDIO_LOCALFILE) {
         uint32_t actualPos = m_audiofile.position(); // starts with 1
         if (actualPos != m_audioFilePosition) {
-            AUDIO_LOG_DEBUG("actualPos != m_audioFilePosition %u != %u", actualPos, m_audioFilePosition);
+            AUDIO_LOGF_DEBUG("actualPos != m_audioFilePosition {} != {}", actualPos, m_audioFilePosition);
             m_audioFilePosition = actualPos;
         }
         if (!m_audiofile) return -1;
         if (position > m_audiofile.size()) {
-            AUDIO_LOG_WARN("position larger than size %u > %zu", position, m_audiofile.size());
+            AUDIO_LOGF_WARN("position larger than size {} > {}", position, m_audiofile.size());
             position = m_audiofile.size();
         }
         bool r = m_audiofile.seek(position);
         m_audioFilePosition = m_audiofile.position();
         if (r == false) {
-            AUDIO_LOG_ERROR("something went wrong");
+            AUDIO_LOGF_ERROR("something went wrong");
             return -1;
         } else {
             return position;
@@ -6093,12 +6093,12 @@ int32_t Audio::audioFileSeek(uint32_t position, size_t len) {
             if (len == 0) len = UINT32_MAX;
             r = httpRange(position, len);
             if (res == false) {
-                AUDIO_LOG_ERROR("http range request was not successful");
+                AUDIO_LOGF_ERROR("http range request was not successful");
                 return 0;
             }
             r = parseHttpRangeHeader();
             if (r == false) {
-                AUDIO_LOG_ERROR("http range response was not successful");
+                AUDIO_LOGF_ERROR("http range response was not successful");
                 return 0;
             }
             m_audioFilePosition = position;
@@ -6111,7 +6111,7 @@ int32_t Audio::audioFileSeek(uint32_t position, size_t len) {
 bool Audio::fsRange(uint32_t range) {
 
     if ((m_dataMode == AUDIO_LOCALFILE) && !m_audiofile) {
-        AUDIO_LOG_WARN("%s", "local file not accessibble");
+        AUDIO_LOGF_WARN("{}", "local file not accessibble");
         return false;
     } // guard
     uint32_t startAB = m_audioDataStart;                 // audioblock begin
@@ -6128,7 +6128,7 @@ bool Audio::setSampleRate(uint32_t sampRate) {
 
     if (!sampRate) return false;
     if (sampRate < 8000) {
-        AUDIO_LOG_WARN("Sample rate must not be smaller than 8kHz, found: %u", sampRate);
+        AUDIO_LOGF_WARN("Sample rate must not be smaller than 8kHz, found: {}", sampRate);
         return false;
     }
     m_i2s_items.sampleRate = sampRate;
@@ -6174,18 +6174,18 @@ uint64_t Audio::getLastGranulePosition(uint8_t codec) {
     uint64_t granulePos = 0;
     uint8_t* buff = (uint8_t*)ps_malloc(UINT16_MAX);
     if (!buff) {
-        AUDIO_LOG_ERROR("oom");
+        AUDIO_LOGF_ERROR("oom");
         return 0;
     }
     int rangeStart = m_audioFileSize - UINT16_MAX - 1;
-    AUDIO_LOG_DEBUG("rangeStart: %d, audioFileSize: %u, len: %u", rangeStart, m_audioFileSize, (unsigned)UINT16_MAX);
+    AUDIO_LOGF_DEBUG("rangeStart: {}, audioFileSize: {}, len: {}", rangeStart, m_audioFileSize, (unsigned)UINT16_MAX);
     audioFileSeek(rangeStart, UINT16_MAX);
     audioFileRead(buff, UINT16_MAX);
     int32_t pos = specialIndexOfLast(buff, "OggS", UINT16_MAX);
     if (buff[pos + 5] & 0x04) { // is last page;
         for (int j = 0; j < 8; j++) { granulePos |= ((uint64_t)buff[pos + 6 + j] << (j * 8)); }
     }
-    AUDIO_LOG_DEBUG("granulePos %llu", (unsigned long long)granulePos);
+    AUDIO_LOGF_DEBUG("granulePos {}", (unsigned long long)granulePos);
     m_resumeFilePos = 0;
     if (buff) {
         free(buff);
@@ -6314,7 +6314,7 @@ void Audio::calculateVUlevel(int32_t* sample) { // Envelope-Follower
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 uint16_t Audio::getVUlevel() {
     if (!m_f_running) return 0;
-    AUDIO_LOG_DEBUG("%u", (uint8_t)m_vu_items.left);
+    AUDIO_LOGF_DEBUG("{}", (uint8_t)m_vu_items.left);
     // avg 0 ... 255                                                                                  MSB          LSB
     return ((uint8_t)m_vu_items.right_peak << 8) + (uint8_t)m_vu_items.left_peak; // returns  rrrrrrrrllllllll
 }
@@ -6436,7 +6436,7 @@ void Audio::calculateVolumeLimits() { // is calculated when the volume or balanc
 
     m_audio_items.limiter[LEFTCHANNEL] = vol * powf(10.0f, l_db / 20.0f);
     m_audio_items.limiter[RIGHTCHANNEL] = vol * powf(10.0f, r_db / 20.0f);
-    AUDIO_LOG_DEBUG("m_limiter[LEFTCHANNEL] %f, m_limiter[RIGHTCHANNEL] %f", m_audio_items.limiter[LEFTCHANNEL], m_audio_items.limiter[RIGHTCHANNEL]);
+    AUDIO_LOGF_DEBUG("m_limiter[LEFTCHANNEL] {}, m_limiter[RIGHTCHANNEL] {}", m_audio_items.limiter[LEFTCHANNEL], m_audio_items.limiter[RIGHTCHANNEL]);
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 void Audio::processSpectrum() {
@@ -6544,7 +6544,7 @@ void Audio::processSpectrum() {
 
         m_fft_items.spectrum[i] = (uint8_t)(norm * 255.0f);
     }
-    //    AUDIO_LOG_INFO("% 4i, % 4i, % 4i, % 4i, % 4i, % 4i ", m_fft_items.spectrum[0], m_fft_items.spectrum[1],  m_fft_items.spectrum[2],  m_fft_items.spectrum[3],  m_fft_items.spectrum[4],
+    //    AUDIO_LOGF_INFO("{ :4}, { :4}, { :4}, { :4}, { :4}, { :4} ", m_fft_items.spectrum[0], m_fft_items.spectrum[1],  m_fft_items.spectrum[2],  m_fft_items.spectrum[3],  m_fft_items.spectrum[4],
     //    m_fft_items.spectrum[3]);
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -6585,7 +6585,7 @@ void Audio::stereo2mono(int32_t* buff, uint16_t validSamples) {
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 void Audio::IIR_calculateCoefficients() { // Infinite Impulse Response (IIR) filters
 
-    AUDIO_LOG_DEBUG("gain gain_ls_db %f, gain gain_peq_db %f, gain gain_hs_db %f", m_audio_items.gain_ls_db, m_audio_items.gain_peq_db, m_audio_items.gain_hs_db);
+    AUDIO_LOGF_DEBUG("gain gain_ls_db {}, gain gain_peq_db {}, gain gain_hs_db {}", m_audio_items.gain_ls_db, m_audio_items.gain_peq_db, m_audio_items.gain_hs_db);
 
     const float FcLS = settings.FREQ_LS_HZ;     // Frequency LowShelf(Hz)
     const float FcPKEQ = settings.FREQ_PEAK_HZ; // Frequency PeakEQ(Hz)
@@ -6622,11 +6622,11 @@ void Audio::IIR_calculateCoefficients() { // Infinite Impulse Response (IIR) fil
     dsps_biquad_gen_peakingEQ_f32(m_audio_items.coeffs[PEAKINGEQ], normFreqPEQ, m_audio_items.gain_peq_db, QS); // my own calc.
     dsps_biquad_gen_highShelf_f32(m_audio_items.coeffs[HIFGSHELF], normFreqHS, m_audio_items.gain_hs_db, QS);
 
-    AUDIO_LOG_DEBUG("\n([%f, %f, %f], [1.0, %f, %f]), # LOWSHELF\n([%f,  %f,  %f ], [1.0, %f,  %f ]), # PEAKINGEQ\n([%f, %f, %f], [1.0, %f, %f]), # HIGHSHELF\n", m_audio_items.coeffs[0][0],
+    AUDIO_LOGF_DEBUG("\n([{}, {}, {}], [1.0, {}, {}]), # LOWSHELF\n([{},  {},  {} ], [1.0, {},  {} ]), # PEAKINGEQ\n([{}, {}, {}], [1.0, {}, {}]), # HIGHSHELF\n", m_audio_items.coeffs[0][0],
                     m_audio_items.coeffs[0][1], m_audio_items.coeffs[0][2], m_audio_items.coeffs[0][3], m_audio_items.coeffs[0][4], m_audio_items.coeffs[1][0], m_audio_items.coeffs[1][1],
                     m_audio_items.coeffs[1][2], m_audio_items.coeffs[1][3], m_audio_items.coeffs[1][4], m_audio_items.coeffs[2][0], m_audio_items.coeffs[2][1], m_audio_items.coeffs[2][2],
                     m_audio_items.coeffs[2][3], m_audio_items.coeffs[2][4]);
-    AUDIO_LOG_DEBUG("m_audio_items.pre_gain %f", m_audio_items.pre_gain);
+    AUDIO_LOGF_DEBUG("m_audio_items.pre_gain {}", m_audio_items.pre_gain);
     memset(m_audio_items.state_biquad, 0, sizeof(m_audio_items.state_biquad));
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -6662,7 +6662,7 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
     (void)PAYLOAD_SIZE; // suppress [-Wunused-variable]
 
     if (packet == NULL) {
-        if (log) AUDIO_LOG_WARN("parseTS reset");
+        if (log) AUDIO_LOGF_WARN("parseTS reset");
         m_tspp.reset();
         return true;
     }
@@ -6692,21 +6692,21 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
     // printf("\n----------\n");
 
     if (packet[0] != 0x47) {
-        AUDIO_LOG_ERROR("ts SyncByte not found, first bytes are 0x%02X 0x%02X 0x%02X 0x%02X", packet[0], packet[1], packet[2], packet[3]);
+        AUDIO_LOGF_ERROR("ts SyncByte not found, first bytes are 0x{} 0x{} 0x{} 0x{}", packet[0], packet[1], packet[2], packet[3]);
         stopSong();
         return false;
     }
     int PID = (packet[1] & 0x1F) << 8 | (packet[2] & 0xFF);
-    if (log) AUDIO_LOG_DEBUG("PID: 0x%04X (%d)", PID, PID);
+    if (log) AUDIO_LOGF_DEBUG("PID: 0x{} ({})", PID, PID);
     int PUSI = (packet[1] & 0x40) >> 6;
-    if (log) AUDIO_LOG_DEBUG("Payload Unit Start Indicator: %d", PUSI);
+    if (log) AUDIO_LOGF_DEBUG("Payload Unit Start Indicator: {}", PUSI);
     int AFC = (packet[3] & 0x30) >> 4;
-    if (log) AUDIO_LOG_DEBUG("Adaption Field Control: %d", AFC);
+    if (log) AUDIO_LOGF_DEBUG("Adaption Field Control: {}", AFC);
 
     int AFL = -1;
     if ((AFC & 0b10) == 0b10) { // AFC '11' Adaptation Field followed
         AFL = packet[4] & 0xFF; // Adaptation Field Length
-        if (log) AUDIO_LOG_DEBUG("Adaptation Field Length: %d", AFL);
+        if (log) AUDIO_LOGF_DEBUG("Adaptation Field Length: {}", AFL);
     }
     int PLS = PUSI ? 5 : 4;      // PayLoadStart, Payload Unit Start Indicator
     if (AFL > 0) PLS += AFL + 1; // skip adaption field
@@ -6719,21 +6719,21 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
 
     if (PID == 0) {
         // Program Association Table (PAT) - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (log) AUDIO_LOG_DEBUG("PAT");
+        if (log) AUDIO_LOGF_DEBUG("PAT");
         m_tspp.pidNumber = 0;
         m_tspp.pidOfAAC = 0;
 
         int startOfProgramNums = 8;
         int lengthOfPATValue = 4;
         int sectionLength = ((packet[PLS + 1] & 0x0F) << 8) | (packet[PLS + 2] & 0xFF);
-        if (log) AUDIO_LOG_DEBUG("Section Length: %d", sectionLength);
+        if (log) AUDIO_LOGF_DEBUG("Section Length: {}", sectionLength);
         int program_number, program_map_PID;
         int indexOfPids = 0;
         (void)program_number; // [-Wunused-but-set-variable]
         for (int i = startOfProgramNums; i <= sectionLength; i += lengthOfPATValue) {
             program_number = ((packet[PLS + i] & 0xFF) << 8) | (packet[PLS + i + 1] & 0xFF);
             program_map_PID = ((packet[PLS + i + 2] & 0x1F) << 8) | (packet[PLS + i + 3] & 0xFF);
-            if (log) AUDIO_LOG_DEBUG("Program Num: 0x%04X(%d) PMT PID: 0x%04X(%d)", program_number, program_number, program_map_PID, program_map_PID);
+            if (log) AUDIO_LOGF_DEBUG("Program Num: 0x{}({}) PMT PID: 0x{}({})", program_number, program_number, program_map_PID, program_map_PID);
             m_tspp.pids[indexOfPids++] = program_map_PID;
         }
         m_tspp.pidNumber = indexOfPids;
@@ -6741,18 +6741,18 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
         *packetLength = 0;
         return true;
     } else if (PID == m_tspp.pidOfAAC) {
-        if (log) AUDIO_LOG_DEBUG("AAC");
+        if (log) AUDIO_LOGF_DEBUG("AAC");
         uint8_t posOfPacketStart = 4;
         if (AFL >= 0) {
             posOfPacketStart = 5 + AFL;
-            if (log) AUDIO_LOG_DEBUG("posOfPacketStart: %d", posOfPacketStart);
+            if (log) AUDIO_LOGF_DEBUG("posOfPacketStart: {}", posOfPacketStart);
         }
         // Packetized Elementary Stream (PES) - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-        if (log) AUDIO_LOG_DEBUG("PES_DataLength %i", m_tspp.PES_DataLength);
+        if (log) AUDIO_LOGF_DEBUG("PES_DataLength {}", m_tspp.PES_DataLength);
         if (m_tspp.PES_DataLength > 0) {
             *packetStart = posOfPacketStart + m_tspp.fillData;
             *packetLength = TS_PACKET_SIZE - posOfPacketStart - m_tspp.fillData;
-            if (log) AUDIO_LOG_DEBUG("packetlength %i", *packetLength);
+            if (log) AUDIO_LOGF_DEBUG("packetlength {}", *packetLength);
             m_tspp.fillData = 0;
             m_tspp.PES_DataLength -= (*packetLength);
             return true;
@@ -6760,7 +6760,7 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
             int firstByte = packet[posOfPacketStart] & 0xFF;
             int secondByte = packet[posOfPacketStart + 1] & 0xFF;
             int thirdByte = packet[posOfPacketStart + 2] & 0xFF;
-            if (log) AUDIO_LOG_DEBUG("First 3 bytes: 0x%02X, 0x%02X, 0x%02X", firstByte, secondByte, thirdByte);
+            if (log) AUDIO_LOGF_DEBUG("First 3 bytes: 0x{}, 0x{}, 0x{}", firstByte, secondByte, thirdByte);
             if (firstByte == 0x00 && secondByte == 0x00 && thirdByte == 0x01) { // Packet start code prefix
                 // --------------------------------------------------------------------------------------------------------
                 // posOfPacketStart + 0...2     0x00, 0x00, 0x01                                          PES-Startcode
@@ -6777,11 +6777,11 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
                 uint8_t StreamID = packet[posOfPacketStart + 3] & 0xFF;
                 if (StreamID >= 0xC0 && StreamID <= 0xDF) { ; } // okay ist audio stream
                 if (StreamID >= 0xE0 && StreamID <= 0xEF) {
-                    AUDIO_LOG_ERROR("video stream!");
+                    AUDIO_LOGF_ERROR("video stream!");
                     return false;
                 }
                 int PES_PacketLength = ((packet[posOfPacketStart + 4] & 0xFF) << 8) + (packet[posOfPacketStart + 5] & 0xFF);
-                if (log) AUDIO_LOG_DEBUG("PES PacketLength: %d", PES_PacketLength);
+                if (log) AUDIO_LOGF_DEBUG("PES PacketLength: {}", PES_PacketLength);
                 bool PTS_flag = false;
                 bool DTS_flag = false;
                 int  flag_byte1 = packet[posOfPacketStart + 6] & 0xFF;
@@ -6789,24 +6789,24 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
                 (void)flag_byte2; // unused yet
                 if (flag_byte1 & 0b10000000) PTS_flag = true;
                 if (flag_byte1 & 0b00000100) DTS_flag = true;
-                if (log && PTS_flag) AUDIO_LOG_DEBUG("PTS_flag is set");
-                if (log && DTS_flag) AUDIO_LOG_DEBUG("DTS_flag is set");
+                if (log && PTS_flag) AUDIO_LOGF_DEBUG("PTS_flag is set");
+                if (log && DTS_flag) AUDIO_LOGF_DEBUG("DTS_flag is set");
                 uint8_t PES_HeaderDataLength = packet[posOfPacketStart + 8] & 0xFF;
-                if (log) AUDIO_LOG_DEBUG("PES_headerDataLength %d", PES_HeaderDataLength);
+                if (log) AUDIO_LOGF_DEBUG("PES_headerDataLength {}", PES_HeaderDataLength);
 
                 m_tspp.PES_DataLength = PES_PacketLength;
                 int startOfData = PES_HeaderDataLength + 9;
                 if (posOfPacketStart + startOfData >= 188) { // only fillers in packet
-                    if (log) AUDIO_LOG_DEBUG("posOfPacketStart + startOfData %i", posOfPacketStart + startOfData);
+                    if (log) AUDIO_LOGF_DEBUG("posOfPacketStart + startOfData {}", posOfPacketStart + startOfData);
                     *packetStart = 0;
                     *packetLength = 0;
                     m_tspp.PES_DataLength -= (PES_HeaderDataLength + 3);
                     m_tspp.fillData = (posOfPacketStart + startOfData) - 188;
-                    if (log) AUDIO_LOG_DEBUG("fillData %i", m_tspp.fillData);
+                    if (log) AUDIO_LOGF_DEBUG("fillData {}", m_tspp.fillData);
                     return true;
                 }
-                if (log) AUDIO_LOG_DEBUG("First AAC data byte: %02X", packet[posOfPacketStart + startOfData]);
-                if (log) AUDIO_LOG_DEBUG("Second AAC data byte: %02X", packet[posOfPacketStart + startOfData + 1]);
+                if (log) AUDIO_LOGF_DEBUG("First AAC data byte: {}", packet[posOfPacketStart + startOfData]);
+                if (log) AUDIO_LOGF_DEBUG("Second AAC data byte: {}", packet[posOfPacketStart + startOfData + 1]);
                 *packetStart = posOfPacketStart + startOfData;
                 *packetLength = TS_PACKET_SIZE - posOfPacketStart - startOfData;
                 m_tspp.PES_DataLength -= (*packetLength);
@@ -6821,30 +6821,30 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
         }
         *packetStart = 0;
         *packetLength = 0;
-        AUDIO_LOG_ERROR("PES not found");
+        AUDIO_LOGF_ERROR("PES not found");
         return false;
     } else if (m_tspp.pidNumber) {
         //  Program Map Table (PMT) - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
         for (int i = 0; i < m_tspp.pidNumber; i++) {
             if (PID == m_tspp.pids[i]) {
-                if (log) AUDIO_LOG_DEBUG("PMT");
+                if (log) AUDIO_LOGF_DEBUG("PMT");
                 int staticLengthOfPMT = 12;
                 int sectionLength = ((packet[PLS + 1] & 0x0F) << 8) | (packet[PLS + 2] & 0xFF);
-                if (log) AUDIO_LOG_DEBUG("Section Length: %d", sectionLength);
+                if (log) AUDIO_LOGF_DEBUG("Section Length: {}", sectionLength);
                 int programInfoLength = ((packet[PLS + 10] & 0x0F) << 8) | (packet[PLS + 11] & 0xFF);
-                if (log) AUDIO_LOG_DEBUG("Program Info Length: %d", programInfoLength);
+                if (log) AUDIO_LOGF_DEBUG("Program Info Length: {}", programInfoLength);
                 int cursor = staticLengthOfPMT + programInfoLength;
                 while (cursor < sectionLength - 1) {
                     int streamType = packet[PLS + cursor] & 0xFF;
                     int elementaryPID = ((packet[PLS + cursor + 1] & 0x1F) << 8) | (packet[PLS + cursor + 2] & 0xFF);
-                    if (log) AUDIO_LOG_DEBUG("Stream Type: 0x%02X Elementary PID: 0x%04X", streamType, elementaryPID);
+                    if (log) AUDIO_LOGF_DEBUG("Stream Type: 0x{} Elementary PID: 0x{}", streamType, elementaryPID);
 
                     if (streamType == 0x0F || streamType == 0x11 || streamType == 0x04) {
-                        if (log) AUDIO_LOG_DEBUG("AAC PID discover");
+                        if (log) AUDIO_LOGF_DEBUG("AAC PID discover");
                         m_tspp.pidOfAAC = elementaryPID;
                     }
                     int esInfoLength = ((packet[PLS + cursor + 3] & 0x0F) << 8) | (packet[PLS + cursor + 4] & 0xFF);
-                    if (log) AUDIO_LOG_DEBUG("ES Info Length: 0x%04X", esInfoLength);
+                    if (log) AUDIO_LOGF_DEBUG("ES Info Length: 0x{}", esInfoLength);
                     cursor += 5 + esInfoLength;
                 }
             }
@@ -6877,7 +6877,7 @@ bool Audio::readMetadata(uint32_t maxBytes, uint16_t* readedBytes, bool first) {
     if (!m_rmet.metaDataSize) {
         int b = audioFileRead(); // First byte of metadata?
         if (b < 0) {
-            AUDIO_LOG_WARN("client->read() failed (%d)", b);
+            AUDIO_LOGF_WARN("client->read() failed ({})", b);
             return false;
         }
         m_rmet.metaDataSize = b * 16; // New count for metadata including length byte, max 4096
@@ -6946,19 +6946,19 @@ int32_t Audio::getChunkSize(uint16_t* readedBytes, bool first) {
             int a = audioFileRead();
             m_gchs.oneByteOfTwo = true;
             *readedBytes = 1;
-            if (a != 0x0D) AUDIO_LOG_WARN("chunk count error, expected: 0x0D, received: 0x%02X", a);
+            if (a != 0x0D) AUDIO_LOGF_WARN("chunk count error, expected: 0x0D, received: 0x{}", a);
 
             return -1;
         }
         if (!m_gchs.oneByteOfTwo) {
             int a = audioFileRead();
-            if (a != 0x0D) AUDIO_LOG_WARN("chunk count error, expected: 0x0D, received: 0x%02X", a);
+            if (a != 0x0D) AUDIO_LOGF_WARN("chunk count error, expected: 0x0D, received: 0x{}", a);
             *readedBytes += 1;
             if (!m_client->available()) { return -1; }
         }
         m_gchs.oneByteOfTwo = false;
         int b = audioFileRead();
-        if (b != 0x0A) AUDIO_LOG_WARN("chunk count error, expected: 0x0A, received: 0x%02X", b);
+        if (b != 0x0A) AUDIO_LOGF_WARN("chunk count error, expected: 0x0A, received: 0x{}", b);
         *readedBytes += 1;
         m_gchs.f_skipCRLF = false;
         if (!m_client->available()) { return -1; }
@@ -6970,7 +6970,7 @@ int32_t Audio::getChunkSize(uint16_t* readedBytes, bool first) {
 
     while (true) {
         if ((millis() - ctime) > timeout) {
-            AUDIO_LOG_ERROR("chunkedDataTransfer: timeout");
+            AUDIO_LOGF_ERROR("chunkedDataTransfer: timeout");
             stopSong();
             return 0;
         }
@@ -6991,7 +6991,7 @@ int32_t Audio::getChunkSize(uint16_t* readedBytes, bool first) {
             m_gchs.isHttpChunked = false;
             // determine limit from the current data volume + already read bytes
             m_gchs.transportLimit = m_client->available() + *readedBytes;
-            AUDIO_LOG_DEBUG("No http chunked recognized-switch to transport chunking with limit %u", (unsigned)m_gchs.transportLimit);
+            AUDIO_LOGF_DEBUG("No http chunked recognized-switch to transport chunking with limit {}", (unsigned)m_gchs.transportLimit);
             return m_gchs.transportLimit;
         }
     }
@@ -7086,7 +7086,7 @@ bool Audio::readID3V1Tag() {
 int32_t Audio::newInBuffStart(int32_t resumeFilePos) {
 
     if ((m_controlCounter != 100) || (m_resumeFilePos >= (int32_t)m_audioDataStart + m_audioDataSize) || ((m_codec == CODEC_M4A) && !m_stsz_position)) {
-        AUDIO_LOG_WARN("timeOffset not possible");
+        AUDIO_LOGF_WARN("timeOffset not possible");
         return 0;
     }
 
@@ -7095,7 +7095,7 @@ int32_t Audio::newInBuffStart(int32_t resumeFilePos) {
 
     uint32_t buffFillValue = std::min<uint32_t>(m_audioDataSize - resumeFilePos, UINT16_MAX);
 
-    AUDIO_LOG_DEBUG("new InBuff start at m_resumeFilePos %i, m_audioDataStart %u", m_resumeFilePos, m_audioDataStart);
+    AUDIO_LOGF_DEBUG("new InBuff start at m_resumeFilePos {}, m_audioDataStart {}", m_resumeFilePos, m_audioDataStart);
 
     // --- enter critical area ------------------------------------------
     xSemaphoreTake(mutex_audioTaskIsDecoding, 1 * configTICK_RATE_HZ);
@@ -7116,7 +7116,7 @@ int32_t Audio::newInBuffStart(int32_t resumeFilePos) {
     // ---------------------------------------------------------------------------
 
     auto fail = [&]() {
-        AUDIO_LOG_ERROR("can't set newFilePos");
+        AUDIO_LOGF_ERROR("can't set newFilePos");
         InBuff.bytesWasRead(0);
         m_f_lockInBuffer = false;
         xSemaphoreGive(mutex_audioTaskIsDecoding);
@@ -7159,7 +7159,7 @@ int32_t Audio::newInBuffStart(int32_t resumeFilePos) {
         default: return fail();
     }
 
-    AUDIO_LOG_DEBUG("offset %i", offset);
+    AUDIO_LOGF_DEBUG("offset {}", offset);
     newFilePos += offset;
     m_decoder->clear();
 
@@ -7174,7 +7174,7 @@ int32_t Audio::newInBuffStart(int32_t resumeFilePos) {
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————-
 boolean Audio::streamDetection(uint32_t bytesAvail) {
     if (!m_lastHost.valid()) {
-        AUDIO_LOG_ERROR("m_lastHost is empty");
+        AUDIO_LOGF_ERROR("m_lastHost is empty");
         return false;
     }
 
@@ -7234,7 +7234,7 @@ uint32_t Audio::m4a_correctResumeFilePos() {
             vTaskDelay(10);
             cnt++;
             if (cnt > 300) {
-                AUDIO_LOG_ERROR("timeout");
+                AUDIO_LOGF_ERROR("timeout");
                 break;
             }
         }
@@ -7264,7 +7264,7 @@ uint32_t Audio::ogg_correctResumeFilePos() {
     // The starting point is the next OggS magic word
     if (InBuff.bufferFilled() < 0xFFFF) return 0;
     vTaskDelay(1);
-    // // AUDIO_LOG_INFO("in_resumeFilePos %i", resumeFilePos);
+    // // AUDIO_LOGF_INFO("in_resumeFilePos {}", resumeFilePos);
 
     auto find_sync_word = [&](uint8_t* pos, uint32_t av) -> int {
         int steps = 0;
@@ -7349,8 +7349,8 @@ int32_t Audio::flac_correctResumeFilePos() {
 
         size_t crc_end = pos + len; // this is where the CRC byte lives
 
-        AUDIO_LOG_DEBUG("samplerate_code %i, bps_code %i channel_assign %i, reserved_bit %i", samplerate_code, bps_code, channel_assign, reserved_bit);
-        AUDIO_LOG_DEBUG("b0 %i, b1 %i, b2 %i, b3 %i", b0, b1, b2, b3);
+        AUDIO_LOGF_DEBUG("samplerate_code {}, bps_code {} channel_assign {}, reserved_bit {}", samplerate_code, bps_code, channel_assign, reserved_bit);
+        AUDIO_LOGF_DEBUG("b0 {}, b1 {}, b2 {}, b3 {}", b0, b1, b2, b3);
 
         uint8_t crc = 0;
         for (size_t k = i; k < crc_end; ++k) crc = crc8_update(crc, p[k]);
@@ -7358,7 +7358,7 @@ int32_t Audio::flac_correctResumeFilePos() {
         if (crc != p[crc_end]) continue;
 
         // === Wenn wir hier ankommen: 99,9999 % sicher ein echter Frame ===
-        AUDIO_LOG_ERROR(">>> ECHTER FLAC-FRAME gefunden bei Offset %u", (uint32_t)i);
+        AUDIO_LOGF_ERROR(">>> ECHTER FLAC-FRAME gefunden bei Offset {}", (uint32_t)i);
         return (int32_t)i;
     }
 
@@ -7381,7 +7381,7 @@ int32_t Audio::mp3_correctResumeFilePos() {
         pos += steps;
         sumSteps += steps;
     }
-    // AUDIO_LOG_INFO("found sync word at %i  sync1 = 0x%02X, sync2 = 0x%02X", readPtr - pos, *readPtr, *(readPtr + 1));
+    // AUDIO_LOGF_INFO("found sync word at {%i}  sync1 = {:02x}, sync2 = {:02x}", readPtr - pos, *readPtr, *(readPtr + 1));
     return sumSteps; // return the position of the first byte of the frame
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————-
@@ -7405,7 +7405,7 @@ uint8_t Audio::determineCodec(uint8_t presumed_codec) {
         uint8_t res = CODEC_NONE;
         int     idx = -1;
         idx = specialIndexOf(InBuff.getReadPtr(), "OggS", 127);
-        AUDIO_LOG_DEBUG("idx %i", idx);
+        AUDIO_LOGF_DEBUG("idx {}", idx);
         if (idx == 0) {
             idx = specialIndexOf(InBuff.getReadPtr(), "OpusHead", 127);
             if (idx >= 28) { res = CODEC_OPUS; }
@@ -7416,7 +7416,7 @@ uint8_t Audio::determineCodec(uint8_t presumed_codec) {
 
             m_lastGranulePosition = getLastGranulePosition(res); // VORBIS or OPUS only
             audioFileSeek(0);                                    // if isFile?
-            AUDIO_LOG_DEBUG("lastGranulePosition %llu", (unsigned long long)m_lastGranulePosition);
+            AUDIO_LOGF_DEBUG("lastGranulePosition {}", (unsigned long long)m_lastGranulePosition);
         }
         return res;
     }
@@ -7748,7 +7748,7 @@ void Audio::setAudioTaskCore(uint8_t coreID) { // Recommendation:If the ARDUINO 
 void Audio::startAudioTask() {
 
     if (m_f_audioTaskIsRunning) {
-        AUDIO_LOG_INFO("audio task is already running.");
+        AUDIO_LOGF_INFO("audio task is already running.");
         return;
     }
     m_f_audioTaskIsRunning = true;
@@ -7766,7 +7766,7 @@ void Audio::startAudioTask() {
 
 void Audio::stopAudioTask() {
     if (!m_f_audioTaskIsRunning) {
-        AUDIO_LOG_INFO("audio task is not running.");
+        AUDIO_LOGF_INFO("audio task is not running.");
         return;
     }
     xSemaphoreTake(mutex_audioTask, 0.3 * configTICK_RATE_HZ);
