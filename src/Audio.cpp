@@ -323,10 +323,10 @@ void AudioBuffer::reset() {
 }
 
 void AudioBuffer::showStatus() {
-    printf("\nfilled %i, free %i\n", bufferFilled(), freeSpace());
-    printf("writeSpace %i, readSpace %i\n", writeSpace(), readSpace());
-    printf("writePtr %i, readPtr %i\n", m_writePtr - m_startPtr, m_readPtr - m_startPtr);
-    printf("isEmpty %i, isFull %i\n\n", m_isEmpty, m_isFull);
+    printf("\nfilled {}, free {}\n", bufferFilled(), freeSpace());
+    printf("writeSpace {}, readSpace {}\n", writeSpace(), readSpace());
+    printf("writePtr {}, readPtr {}\n", m_writePtr - m_startPtr, m_readPtr - m_startPtr);
+    printf("isEmpty {}, isFull {}\n\n", m_isEmpty, m_isFull);
 }
 
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -993,11 +993,11 @@ bool Audio::httpRange(uint32_t seek, uint32_t length) {
     cur_hwoe.clone_from(dismantledLastHost.hwoe);
 
     if (length == UINT32_MAX)
-        range.assignf("Range: bytes=%li-\r\n", seek);
+        range.assignf("Range: bytes={}-\r\n", seek);
     else
-        range.assignf("Range: bytes=%li-%li\r\n", seek, seek + length);
+        range.assignf("Range: bytes={}-{}\r\n", seek, seek + length);
 
-    rqh.assignf("GET /%s HTTP/1.1\r\n", path.get());
+    rqh.assignf("GET /{} HTTP/1.1\r\n", path.get());
     rqh.appendf("Host: %s\r\n", rqh_host.get());
     rqh.append("Accept: */*\r\n");
     rqh.append("Accept-Encoding: identity;q=1,*;q=0\r\n");
@@ -3022,9 +3022,9 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
                                 m_m4aHdr.picPos = pos + 24 - as;
                                 AUDIO_LOG_DEBUG("cover jpeg start: {}, len {}", m_m4aHdr.picPos, m_m4aHdr.picLen);
                             }
-                            id3tag.assignf("%s: %i", tags[i].descr, &sa[24]); // binary
+                            id3tag.assignf("{}: {}", tags[i].descr, &sa[24]); // binary
                         } else if (dty == 1 && strlen(&sa[24]) > 0)
-                            id3tag.assignf("%s: %s", tags[i].descr, &sa[24]); // UTF-8 Text
+                            id3tag.assignf("{}: {}", tags[i].descr, &sa[24]); // UTF-8 Text
                         else if (dty == 0x0D) {
                             m_m4aHdr.picLen = as - 24;
                             m_m4aHdr.picPos = pos + 24 - as;
@@ -5490,7 +5490,7 @@ void Audio::setDecoderItems() {
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 uint32_t Audio::decodeError(int8_t res, uint8_t* data, int32_t bytesDecoded) {
-    // for(int i = 0; i < 10; i++){printf("0x%02X ", data[i]);} printf("\n");
+    // for(int i = 0; i < 10; i++){printf("0x{:02X} ", data[i]);} printf("\n");
     if (res == -100) {
         stopSong();
         return bytesDecoded;
@@ -6688,7 +6688,7 @@ bool Audio::ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packe
     //                                11 – adaptation field followed by payload, 00 – RESERVED for future use
     // CC   Continuity counter, Sequence number of payload packets (0x00 to 0x0F) within each stream (except PID 8191)
 
-    // for(int i = 1; i < 188; i++) {printf("%02X ", packet[i - 1]); if(i && (i % 16 == 0)) printf("\n");}
+    // for(int i = 1; i < 188; i++) {printf("{:02X} ", packet[i - 1]); if(i && (i % 16 == 0)) printf("\n");}
     // printf("\n----------\n");
 
     if (packet[0] != 0x47) {

@@ -601,7 +601,7 @@ class Audio {
         if (!audio_info_callback) return false;
         std::lock_guard<std::mutex> lock(instance.mutex_info); // lock mutex
         ps_ptr<char>                apic;
-        apic.assignf("APIC found at pos %u", v[0]);
+        apic.assignf("APIC found at pos {}", v[0]);
         // msg_t i;
         // i.msg = apic.c_get();
         // i.e = e;
@@ -620,7 +620,68 @@ class Audio {
     }
     //----------------------------------------------------------------------------------------------------------------------
 
-    template <typename... Args> static void AUDIO_LOG_IMPL(uint8_t level, const char* path, int line, const char* fmt, Args&&... args) {
+//     template <typename... Args> static void AUDIO_LOG_IMPL(uint8_t level, const char* path, int line, const char* fmt, Args&&... args) {
+
+// #define ANSI_ESC_RESET   "\033[0m"
+// #define ANSI_ESC_BLACK   "\033[30m"
+// #define ANSI_ESC_RED     "\033[31m"
+// #define ANSI_ESC_GREEN   "\033[32m"
+// #define ANSI_ESC_YELLOW  "\033[33m"
+// #define ANSI_ESC_BLUE    "\033[34m"
+// #define ANSI_ESC_MAGENTA "\033[35m"
+// #define ANSI_ESC_CYAN    "\033[36m"
+// #define ANSI_ESC_WHITE   "\033[37m"
+
+//         ps_ptr<char> logStr;
+//         logStr.copy_from(path);
+//         while (logStr.contains("/")) { logStr.remove_before('/', false); }
+//         logStr.appendf(":%i ", line);
+
+//         if (level == 1 && CORE_DEBUG_LEVEL >= 1) {
+//             logStr.append(ANSI_ESC_RED);
+//         } else if (level == 2 && CORE_DEBUG_LEVEL >= 2) {
+//             logStr.append(ANSI_ESC_YELLOW);
+//         } else if (level == 3 && CORE_DEBUG_LEVEL >= 3) {
+//             logStr.append(ANSI_ESC_GREEN);
+//         } else if (level == 4 && CORE_DEBUG_LEVEL >= 4) {
+//             logStr.append(ANSI_ESC_CYAN);
+//         } // debug
+//         else if (level == 5 && CORE_DEBUG_LEVEL >= 4) {
+//             logStr.append(ANSI_ESC_WHITE);
+//         } // verbose
+//         else
+//             return;
+
+//         int add_len = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
+//         if (add_len > 0) {
+//             logStr.appendf(fmt, std::forward<Args>(args)...); // <-- neue appendf()
+//         }
+//         logStr.append(ANSI_ESC_RESET);
+
+//         msg_t msg;
+//         msg.msg = logStr.get();
+//         const char* tag[7] = {"", "LOGE", "LOGW", "LOGI", "LOGD", "LOGV", ""};
+//         msg.s = tag[level];
+//         msg.e = evt_log;
+
+//         if (audio_info_callback)
+//             audio_info_callback(msg);
+//         else {
+//             if (level == 1)
+//                 log_e("%s", logStr.c_get());
+//             else if (level == 2)
+//                 log_w("%s", logStr.c_get());
+//             else if (level == 3)
+//                 log_i("%s", logStr.c_get());
+//             else if (level == 4)
+//                 log_d("%s", logStr.c_get());
+//             else
+//                 log_v("%s", logStr.c_get());
+//         }
+//         logStr.reset();
+//     }
+
+    template <typename... Args> static void AUDIO_LOG_IMPL(uint8_t level, const char* path, int line, std::string_view fmt, Args&&... args) {
 
 #define ANSI_ESC_RESET   "\033[0m"
 #define ANSI_ESC_BLACK   "\033[30m"
@@ -632,56 +693,6 @@ class Audio {
 #define ANSI_ESC_CYAN    "\033[36m"
 #define ANSI_ESC_WHITE   "\033[37m"
 
-        ps_ptr<char> logStr;
-        logStr.copy_from(path);
-        while (logStr.contains("/")) { logStr.remove_before('/', false); }
-        logStr.appendf(":%i ", line);
-
-        if (level == 1 && CORE_DEBUG_LEVEL >= 1) {
-            logStr.append(ANSI_ESC_RED);
-        } else if (level == 2 && CORE_DEBUG_LEVEL >= 2) {
-            logStr.append(ANSI_ESC_YELLOW);
-        } else if (level == 3 && CORE_DEBUG_LEVEL >= 3) {
-            logStr.append(ANSI_ESC_GREEN);
-        } else if (level == 4 && CORE_DEBUG_LEVEL >= 4) {
-            logStr.append(ANSI_ESC_CYAN);
-        } // debug
-        else if (level == 5 && CORE_DEBUG_LEVEL >= 4) {
-            logStr.append(ANSI_ESC_WHITE);
-        } // verbose
-        else
-            return;
-
-        int add_len = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
-        if (add_len > 0) {
-            logStr.appendf(fmt, std::forward<Args>(args)...); // <-- neue appendf()
-        }
-        logStr.append(ANSI_ESC_RESET);
-
-        msg_t msg;
-        msg.msg = logStr.get();
-        const char* tag[7] = {"", "LOGE", "LOGW", "LOGI", "LOGD", "LOGV", ""};
-        msg.s = tag[level];
-        msg.e = evt_log;
-
-        if (audio_info_callback)
-            audio_info_callback(msg);
-        else {
-            if (level == 1)
-                log_e("%s", logStr.c_get());
-            else if (level == 2)
-                log_w("%s", logStr.c_get());
-            else if (level == 3)
-                log_i("%s", logStr.c_get());
-            else if (level == 4)
-                log_d("%s", logStr.c_get());
-            else
-                log_v("%s", logStr.c_get());
-        }
-        logStr.reset();
-    }
-
-    template <typename... Args> static void AUDIO_LOG_IMPLF(uint8_t level, const char* path, int line, std::string_view fmt, Args&&... args) {
         ps_ptr<char> logStr;
         logStr.copy_from(path);
         while (logStr.contains("/")) { logStr.remove_before('/', false); }
@@ -741,10 +752,10 @@ class Audio {
     }
 
 // Macro for comfortable calls
-#define AUDIO_LOG_ERROR(fmt, ...) AUDIO_LOG_IMPLF(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOG_WARN(fmt, ...)  AUDIO_LOG_IMPLF(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOG_INFO(fmt, ...)  AUDIO_LOG_IMPLF(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
-#define AUDIO_LOG_DEBUG(fmt, ...) AUDIO_LOG_IMPLF(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOG_ERROR(fmt, ...) AUDIO_LOG_IMPL(1, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOG_WARN(fmt, ...)  AUDIO_LOG_IMPL(2, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOG_INFO(fmt, ...)  AUDIO_LOG_IMPL(3, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
+#define AUDIO_LOG_DEBUG(fmt, ...) AUDIO_LOG_IMPL(4, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 };
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -809,9 +820,9 @@ struct _HeapGuardSnapshot {
         free_psram_before = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
         integrity_before = heap_caps_check_integrity_all(true);
         if (!integrity_before) {
-            printf(ANSI_ESC_RED "HEAPGUARD [%s] ❌ Heap corruption detected BEFORE!" ANSI_ESC_RESET "\n", func);
+            printf(ANSI_ESC_RED "HEAPGUARD [{}] ❌ Heap corruption detected BEFORE!" ANSI_ESC_RESET "\n", func);
         } else {
-            printf(ANSI_ESC_GREEN "HEAPGUARD [%s] Begin: DRAM=%u, PSRAM=%u" ANSI_ESC_RESET "\n", func, (unsigned)free_dram_before, (unsigned)free_psram_before);
+            printf(ANSI_ESC_GREEN "HEAPGUARD [{}] Begin: DRAM={}, PSRAM={}" ANSI_ESC_RESET "\n", func, (unsigned)free_dram_before, (unsigned)free_psram_before);
         }
     }
 
@@ -825,9 +836,9 @@ struct _HeapGuardSnapshot {
         int delta_psram = (int)(free_psram_after - free_psram_before);
 
         if (!ok) {
-            printf(ANSI_ESC_RED "HEAPGUARD [%s] ❌ Heap corruption detected AFTER!" ANSI_ESC_RESET "\n", func);
+            printf(ANSI_ESC_RED "HEAPGUARD [{}] ❌ Heap corruption detected AFTER!" ANSI_ESC_RESET "\n", func);
         } else {
-            printf(ANSI_ESC_GREEN "HEAPGUARD [%s] ✅ Heap OK | ΔDRAM=%+d | ΔPSRAM=%+d" ANSI_ESC_RESET "\n", func, delta_dram, delta_psram);
+            printf(ANSI_ESC_GREEN "HEAPGUARD [{}] ✅ Heap OK | ΔDRAM={} | ΔPSRAM={}" ANSI_ESC_RESET "\n", func, abs(delta_dram), abs(delta_psram));
         }
     }
 };
