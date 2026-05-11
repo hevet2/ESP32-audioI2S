@@ -597,6 +597,64 @@ class Audio {
         return true;
     }
 
+    template <typename... Args> static bool infof(Audio& instance, event_t e, std::string_view fmt, Args&&... args) {
+        std::lock_guard<std::mutex> lock(instance.mutex_info); // lock mutex
+                                                               // -------------------------------------------------------------------------------------------------------------------
+        auto extract_last_number = [](std::string_view s) -> int32_t {
+            // start from the back
+            auto it = s.end();
+            // skip whitespaces at the end (if available)
+            while (it != s.begin() && std::isspace(static_cast<unsigned char>(*(it - 1)))) { --it; }
+
+            auto end = it; // potential end of the number
+
+            // Now only search digits backwards
+            while (it != s.begin() && std::isdigit(static_cast<unsigned char>(*(it - 1)))) { --it; }
+
+            // Check: is there a space before it?
+            if (it != s.begin() && std::isspace(static_cast<unsigned char>(*(it - 1)))) {
+                std::string_view number{it, static_cast<size_t>(end - it)};
+                uint32_t         value{};
+                auto [p, ec] = std::from_chars(number.data(), number.data() + number.size(), value);
+                if (ec == std::errc{}) { return static_cast<int32_t>(value); }
+            }
+
+            return -1; // no number found in the end
+        };
+        // -------------------------------------------------------------------------------------------------------------------
+        if (fmt.empty()) return false;
+        if (!audio_info_callback) return false;
+
+        std::string formatted;
+        try {
+            auto convertedArgs = std::make_tuple(safe_argf(std::forward<Args>(args))...);
+            formatted = std::apply(
+                [&](auto&... a) {
+                    return std::vformat(fmt, std::make_format_args(a...));
+                },
+                convertedArgs
+            );
+        } catch (const std::format_error&) {
+            return false;
+        }
+
+        ps_ptr<char> result;
+        result.assign(formatted.c_str());
+        if (!result.valid()) return false;
+
+        std::vector<uint32_t> v; // dummy
+        v.push_back(0);
+        instance.m_info_queue.msg.emplace_front(result);
+        instance.m_info_queue.s.emplace_front(eventStr[e]);
+        instance.m_info_queue.arg1.emplace_front(extract_last_number(result.c_get()));
+        instance.m_info_queue.arg2.emplace_front(0);
+        instance.m_info_queue.vec.emplace_front(v);
+        instance.m_info_queue.e.emplace_front((uint8_t)e);
+
+        result.reset();
+        return true;
+    }
+
     static bool info(Audio& instance, event_t e, std::vector<uint32_t>& v) {
         if (!audio_info_callback) return false;
         std::lock_guard<std::mutex> lock(instance.mutex_info); // lock mutex
