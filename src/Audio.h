@@ -542,7 +542,7 @@ class Audio {
     static const char* safe_argf(std::nullptr_t) { return "(null)"; }
     template <typename T> static auto safe_argf(T&& v) -> decltype(auto) { return std::forward<T>(v); }
 
-    template <typename... Args> static bool info(Audio& instance, event_t e, const char* fmt, Args&&... args) {
+    template <typename... Args> static bool info(Audio& instance, event_t e, std::string_view fmt, Args&&... args) {
         std::lock_guard<std::mutex> lock(instance.mutex_info); // lock mutex
                                                                // -------------------------------------------------------------------------------------------------------------------
         auto extract_last_number = [](std::string_view s) -> int32_t {
@@ -567,23 +567,26 @@ class Audio {
             return -1; // no number found in the end
         };
         // -------------------------------------------------------------------------------------------------------------------
-        if (!fmt) return false;
+        if (fmt.empty()) return false;
         if (!audio_info_callback) return false;
+
+        std::string formatted;
+        try {
+            auto convertedArgs = std::make_tuple(safe_argf(std::forward<Args>(args))...);
+            formatted = std::apply(
+                [&](auto&... a) {
+                    return std::vformat(fmt, std::make_format_args(a...));
+                },
+                convertedArgs
+            );
+        } catch (const std::format_error&) {
+            return false;
+        }
+
         ps_ptr<char> result;
-        // First run: determine size
-        int len = std::snprintf(nullptr, 0, fmt, safe_arg(std::forward<Args>(args))...);
-        if (len <= 0) return false;
-        result.calloc(len + 1);
-        char* p = result.get();
-        if (!p) return false;
-        std::snprintf(p, len + 1, fmt, safe_arg(std::forward<Args>(args))...);
-        // msg_t i = {0};
-        // i.msg = result.c_get();
-        // i.e = e;
-        // i.s = eventStr[e];
-        // i.arg1 = extract_last_number(result.c_get());
-        // i.i2s_num = instance.m_i2s_items.i2s_num;
-        // audio_info_callback(i);
+        result.assign(formatted.c_str());
+        if (!result.valid()) return false;
+
         std::vector<uint32_t> v; // dummy
         v.push_back(0);
         instance.m_info_queue.msg.emplace_front(result);
@@ -759,9 +762,9 @@ struct _HeapGuardSnapshot {
         free_psram_before = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
         integrity_before = heap_caps_check_integrity_all(true);
         if (!integrity_before) {
-            printf(ANSI_ESC_RED "HEAPGUARD [{}] ❌ Heap corruption detected BEFORE!" ANSI_ESC_RESET "\n", func);
+            printf(ANSI_ESC_RED "HEAPGUARD [%s] ❌ Heap corruption detected BEFORE!" ANSI_ESC_RESET "\n", func);
         } else {
-            printf(ANSI_ESC_GREEN "HEAPGUARD [{}] Begin: DRAM={}, PSRAM={}" ANSI_ESC_RESET "\n", func, (unsigned)free_dram_before, (unsigned)free_psram_before);
+            printf(ANSI_ESC_GREEN "HEAPGUARD [%s] Begin: DRAM=%u, PSRAM=%u" ANSI_ESC_RESET "\n", func, (unsigned)free_dram_before, (unsigned)free_psram_before);
         }
     }
 
@@ -775,9 +778,9 @@ struct _HeapGuardSnapshot {
         int delta_psram = (int)(free_psram_after - free_psram_before);
 
         if (!ok) {
-            printf(ANSI_ESC_RED "HEAPGUARD [{}] ❌ Heap corruption detected AFTER!" ANSI_ESC_RESET "\n", func);
+            printf(ANSI_ESC_RED "HEAPGUARD [%s] ❌ Heap corruption detected AFTER!" ANSI_ESC_RESET "\n", func);
         } else {
-            printf(ANSI_ESC_GREEN "HEAPGUARD [{}] ✅ Heap OK | ΔDRAM={} | ΔPSRAM={}" ANSI_ESC_RESET "\n", func, abs(delta_dram), abs(delta_psram));
+            printf(ANSI_ESC_GREEN "HEAPGUARD [%s] ✅ Heap OK | ΔDRAM=%d | ΔPSRAM=%d" ANSI_ESC_RESET "\n", func, abs(delta_dram), abs(delta_psram));
         }
     }
 };
@@ -808,7 +811,7 @@ class _AutoProfiler {
 
         if (count >= N) {
             double avg_us = (double)sum / count;
-            printf(ANSI_ESC_CYAN "PROFILER [{}] avg: {:.2f} µs over {} runs" ANSI_ESC_RESET "\n", tag, avg_us, count);
+            printf(ANSI_ESC_CYAN "PROFILER [%s] avg: %.2f µs over %lu runs" ANSI_ESC_RESET "\n", tag, avg_us, count);
             sum = 0;
             count = 0;
         }

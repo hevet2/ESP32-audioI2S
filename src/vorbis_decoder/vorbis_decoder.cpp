@@ -472,7 +472,7 @@ int32_t VorbisDecoder::parseVorbisComment(uint8_t* inbuf, int16_t nBytes, uint32
             }
             m_comment.item_vec.clear();
             m_f_newMetadataBlockPicture = true;
-            // for (int i = 0; i < m_comment.pic_vec.size(); i += 2) { OPUS_LOG_INFO("Segment %i   %i - %i", i / 2, m_comment.pic_vec[i], m_comment.pic_vec[i + 1]); }
+            // for (int i = 0; i < m_comment.pic_vec.size(); i += 2) { OPUS_LOG_INFO("Segment {}   {} - {}", i / 2, m_comment.pic_vec[i], m_comment.pic_vec[i + 1]); }
             VORBIS_LOG_DEBUG("Skipping embedded picture ({} bytes)", val.size());
             return;
         }
@@ -483,7 +483,7 @@ int32_t VorbisDecoder::parseVorbisComment(uint8_t* inbuf, int16_t nBytes, uint32
                 m_comment.stream_title.append(" - ");
                 m_comment.stream_title.append(val.c_get());
             }
-            audio.info(audio, Audio::evt_id3data, "Artist: %s", val.c_get());
+            audio.info(audio, Audio::evt_id3data, "Artist: {}", val.c_get());
         }
         if (key.starts_with_icase("title")) {
             if (!m_comment.stream_title.valid()) {
@@ -492,15 +492,15 @@ int32_t VorbisDecoder::parseVorbisComment(uint8_t* inbuf, int16_t nBytes, uint32
                 m_comment.stream_title.append(" - ");
                 m_comment.stream_title.append(val.c_get());
             }
-            audio.info(audio, Audio::evt_id3data, "Title: %s", val.c_get());
+            audio.info(audio, Audio::evt_id3data, "Title: {}", val.c_get());
         }
-        if (key.starts_with_icase("work")) { audio.info(audio, Audio::evt_id3data, "Work: %s", val.c_get()); }
-        if (key.starts_with_icase("composer")) { audio.info(audio, Audio::evt_id3data, "Composer: %s", val.c_get()); }
-        if (key.starts_with_icase("genre")) { audio.info(audio, Audio::evt_id3data, "Genre: %s", val.c_get()); }
-        if (key.starts_with_icase("date")) { audio.info(audio, Audio::evt_id3data, "Date: %s", val.c_get()); }
-        if (key.starts_with_icase("album")) { audio.info(audio, Audio::evt_id3data, "Album: %s", val.c_get()); }
-        if (key.starts_with_icase("comment")) { audio.info(audio, Audio::evt_id3data, "Comments: %s", val.c_get()); }
-        if (key.starts_with_icase("tracknumber")) { audio.info(audio, Audio::evt_id3data, "Track number/Position in set: %s", val.c_get()); }
+        if (key.starts_with_icase("work")) { audio.info(audio, Audio::evt_id3data, "Work: {}", val.c_get()); }
+        if (key.starts_with_icase("composer")) { audio.info(audio, Audio::evt_id3data, "Composer: {}", val.c_get()); }
+        if (key.starts_with_icase("genre")) { audio.info(audio, Audio::evt_id3data, "Genre: {}", val.c_get()); }
+        if (key.starts_with_icase("date")) { audio.info(audio, Audio::evt_id3data, "Date: {}", val.c_get()); }
+        if (key.starts_with_icase("album")) { audio.info(audio, Audio::evt_id3data, "Album: {}", val.c_get()); }
+        if (key.starts_with_icase("comment")) { audio.info(audio, Audio::evt_id3data, "Comments: {}", val.c_get()); }
+        if (key.starts_with_icase("tracknumber")) { audio.info(audio, Audio::evt_id3data, "Track number/Position in set: {}", val.c_get()); }
 
         if (m_comment.stream_title.valid()) m_f_newSteamTitle = true;
         // comment.println(); // optional output
@@ -549,7 +549,7 @@ int32_t VorbisDecoder::parseVorbisComment(uint8_t* inbuf, int16_t nBytes, uint32
         }
         if ((uint32_t)available_bytes < to_read) to_read = (uint32_t)available_bytes;
 
-        VORBIS_LOG_DEBUG("to_read {}, available_bytes %i", to_read, available_bytes);
+        VORBIS_LOG_DEBUG("to_read {}, available_bytes {}", to_read, available_bytes);
         m_comment.start_pos = current_file_pos;
         VORBIS_LOG_DEBUG("partial start {}", m_comment.start_pos);
         m_comment.item_vec.push_back(m_comment.start_pos);
