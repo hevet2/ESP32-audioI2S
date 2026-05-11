@@ -892,43 +892,8 @@ class ps_ptr {
     // 📌📌📌  A S S I G N F   📌📌📌
 
     // ps_ptr<char> message;
-    // message.assignf("Code %d, Modul %s", 404, "Network");
+    // message.assignf("Code %d, Modul {}", 404, "Network");
     // printf("%s\n", message.get());  // → Error: Code 404, Modul Network
-
-    // only activate if T = char
-    // template <typename U = T>
-    //     requires std::is_same_v<U, char>
-    // void assignf(const char* fmt, ...) {
-    //     if (!fmt) return;
-    //     // Formatierte Länge berechnen
-    //     va_list args;
-    //     va_start(args, fmt);
-    //     va_list args_copy;
-    //     va_copy(args_copy, args);
-    //     int fmt_len = vsnprintf(nullptr, 0, fmt, args_copy);
-    //     va_end(args_copy);
-
-    //     if (fmt_len < 0) {
-    //         va_end(args);
-    //         return;
-    //     }
-
-    //     std::size_t new_len = static_cast<std::size_t>(fmt_len) + 1;
-
-    //     // share previous memory and new allocates
-    //     reset();
-    //     alloc(new_len);
-    //     if (!mem) {
-    //         printf("OOM: assignf() failed for %zu bytes\n", new_len);
-    //         va_end(args);
-    //         return;
-    //     }
-
-    //     // write formatted text
-    //     vsnprintf(static_cast<char*>(mem.get()), new_len, fmt, args);
-    //     va_end(args);
-    //     allocated_size = fmt_len;
-    // }
 
     template <typename... Args>
     void assignf(std::string_view fmtStr, Args&&... args) {
@@ -971,30 +936,28 @@ class ps_ptr {
 
     // Nur aktivieren, wenn T = char
 
-    template <typename... Args> void appendf(const char* fmt, Args&&... args) {
-        if (!fmt) return;
-        int add_len = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
-        if (add_len < 0) return;
+    template <typename... Args> void appendf(std::string_view fmtStr, Args&&... args) {
+        static_assert(std::is_same_v<T, char>, "appendf is only available for ps_ptr<char>");
 
-        std::size_t old_len = mem ? std::strlen(mem.get()) : 0;
-        std::size_t new_len = old_len + add_len + 1;
+        std::string text;
 
-        char* old_data = static_cast<char*>(mem.release());
-        reset();
-        alloc(new_len);
+        if (fmtStr.find('{') != std::string_view::npos) {
+            text = std::vformat(fmtStr, std::make_format_args(args...));
+        } else {
+            std::string legacyFmt(fmtStr);
+            int         needed = std::snprintf(nullptr, 0, legacyFmt.c_str(), std::forward<Args>(args)...);
+            if (needed < 0) return;
 
-        if (!mem) {
-            printf("OOM: appendf() failed for %zu bytes\n", new_len);
-            if (old_data) free(old_data);
-            return;
+            text.resize(static_cast<std::size_t>(needed));
+            std::snprintf(text.data(), text.size() + 1, legacyFmt.c_str(), std::forward<Args>(args)...);
         }
 
-        if (old_data) {
-            std::memcpy(mem.get(), old_data, old_len);
-            free(old_data);
-        }
+        append(text.c_str());
+    }
 
-        std::snprintf(mem.get() + old_len, new_len - old_len, fmt, std::forward<Args>(args)...);
+    template <typename... Args> void appendf_va(std::string_view fmtStr, Args&&... args) {
+        static_assert(std::is_same_v<T, char>, "appendf_va is only available for ps_ptr<char>");
+        appendf(fmtStr, std::forward<Args>(args)...);
     }
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
     // 📌📌📌  A P P E N D F _ V A  📌📌📌

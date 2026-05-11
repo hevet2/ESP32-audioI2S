@@ -620,67 +620,6 @@ class Audio {
     }
     //----------------------------------------------------------------------------------------------------------------------
 
-//     template <typename... Args> static void AUDIO_LOG_IMPL(uint8_t level, const char* path, int line, const char* fmt, Args&&... args) {
-
-// #define ANSI_ESC_RESET   "\033[0m"
-// #define ANSI_ESC_BLACK   "\033[30m"
-// #define ANSI_ESC_RED     "\033[31m"
-// #define ANSI_ESC_GREEN   "\033[32m"
-// #define ANSI_ESC_YELLOW  "\033[33m"
-// #define ANSI_ESC_BLUE    "\033[34m"
-// #define ANSI_ESC_MAGENTA "\033[35m"
-// #define ANSI_ESC_CYAN    "\033[36m"
-// #define ANSI_ESC_WHITE   "\033[37m"
-
-//         ps_ptr<char> logStr;
-//         logStr.copy_from(path);
-//         while (logStr.contains("/")) { logStr.remove_before('/', false); }
-//         logStr.appendf(":%i ", line);
-
-//         if (level == 1 && CORE_DEBUG_LEVEL >= 1) {
-//             logStr.append(ANSI_ESC_RED);
-//         } else if (level == 2 && CORE_DEBUG_LEVEL >= 2) {
-//             logStr.append(ANSI_ESC_YELLOW);
-//         } else if (level == 3 && CORE_DEBUG_LEVEL >= 3) {
-//             logStr.append(ANSI_ESC_GREEN);
-//         } else if (level == 4 && CORE_DEBUG_LEVEL >= 4) {
-//             logStr.append(ANSI_ESC_CYAN);
-//         } // debug
-//         else if (level == 5 && CORE_DEBUG_LEVEL >= 4) {
-//             logStr.append(ANSI_ESC_WHITE);
-//         } // verbose
-//         else
-//             return;
-
-//         int add_len = std::snprintf(nullptr, 0, fmt, std::forward<Args>(args)...);
-//         if (add_len > 0) {
-//             logStr.appendf(fmt, std::forward<Args>(args)...); // <-- neue appendf()
-//         }
-//         logStr.append(ANSI_ESC_RESET);
-
-//         msg_t msg;
-//         msg.msg = logStr.get();
-//         const char* tag[7] = {"", "LOGE", "LOGW", "LOGI", "LOGD", "LOGV", ""};
-//         msg.s = tag[level];
-//         msg.e = evt_log;
-
-//         if (audio_info_callback)
-//             audio_info_callback(msg);
-//         else {
-//             if (level == 1)
-//                 log_e("%s", logStr.c_get());
-//             else if (level == 2)
-//                 log_w("%s", logStr.c_get());
-//             else if (level == 3)
-//                 log_i("%s", logStr.c_get());
-//             else if (level == 4)
-//                 log_d("%s", logStr.c_get());
-//             else
-//                 log_v("%s", logStr.c_get());
-//         }
-//         logStr.reset();
-//     }
-
     template <typename... Args> static void AUDIO_LOG_IMPL(uint8_t level, const char* path, int line, std::string_view fmt, Args&&... args) {
 
 #define ANSI_ESC_RESET   "\033[0m"
@@ -696,7 +635,7 @@ class Audio {
         ps_ptr<char> logStr;
         logStr.copy_from(path);
         while (logStr.contains("/")) { logStr.remove_before('/', false); }
-        logStr.appendf(":%i ", line);
+        logStr.appendf(":{} ", line);
 
         if (level == 1 && CORE_DEBUG_LEVEL >= 1) {
             logStr.append(ANSI_ESC_RED);
