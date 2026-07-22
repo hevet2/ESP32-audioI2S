@@ -126,8 +126,8 @@ struct plCh_t { // used in playChunk
 };
 
 struct caSa_t { // used in cacheSamples
-    size_t    sourceWordsConsumed = 0;
-    bool      firstCall = false;
+    size_t sourceWordsConsumed = 0;
+    bool   firstCall = false;
 };
 
 struct lVar_t { // used in loop
@@ -368,34 +368,43 @@ struct i2s_items_t {
 };
 
 struct vu_items_t {
-    ps_ptr<int32_t> delay_l;
-    ps_ptr<int32_t> delay_r;
-    uint32_t        delay_line_index = 0;
-    uint32_t        delay_buffer_size = 0;
-    float           left = 0;  // average value of samples, left channel
-    float           right = 0; // average value of samples, right channel
-    uint8_t         left_peak = 0;
-    uint8_t         right_peak = 0;
-    uint16_t        left_hold = 0;
-    uint16_t        right_hold = 0;
+    uint16_t              samps_50ms = {};
+    uint16_t              samps_count = {};
+    uint8_t               attackStep = {};
+    uint8_t               releaseStep = {};
+    uint8_t               maxLeft = {};
+    uint8_t               maxRight = {};
+    uint8_t               measuredLeft;  // Average value of the current 50-ms window
+    uint8_t               measuredRight; // Average value of the current 50-ms window
+    uint8_t               displayLeft;   // current displayed value
+    uint8_t               displayRight;  // current displayed value
+    uint8_t               peakLeft;      // Peak display
+    uint8_t               peakRight;     // Peak display
+    uint8_t               barsHoldLeft_tmp;
+    uint8_t               barsHoldRight_tmp;
+    uint8_t               peakHoldLeft_tmp;
+    uint8_t               peakHoldRight_tmp;
+    uint64_t              sumL = {};
+    uint64_t              sumR = {};
+    ps_ptr<uint8_t>       vuCurve = {};
+    ps_ptr<uint8_t>       delay_bars_left = {};
+    ps_ptr<uint8_t>       delay_bars_right = {};
+    ps_ptr<uint8_t>       delay_peak_left = {};
+    ps_ptr<uint8_t>       delay_peak_right = {};
+    std::vector<uint32_t> lrvec = {};
 };
 
-#define FFT_BANDS 6
-#define FFT_SIZE  256
 struct fft_items_t {
-    const uint16_t SIZE = FFT_SIZE;
-    const uint16_t BANDS = FFT_BANDS;
-    ps_ptr<float>  buffer; // FFT input (real)
-    ps_ptr<float>  window; // FFT window
-    uint16_t       buffer_index = 0;
-    uint16_t       pos = 0;
-    bool           initialized = false;          // FFT state
-    float          spec_smooth[FFT_BANDS] = {0}; // smoothing
-    uint32_t       last_ms = 0;                  // timing (10 Hz)
-    float          gain = 1.0f;                  // AGC in process()
-    bool           lr_switch = false;            // start/stop
-    ps_ptr<float>  work;                         // FFT work buffer (complex interleaved)
-    uint8_t        spectrum[FFT_BANDS] = {0};    // output
+    size_t                count = 0;
+    size_t                samps_100ms = 0;
+    ps_ptr<int16_t>       samples_buffer;
+    size_t                samples_buffer_index = 0;
+    const uint16_t        FFT_SIZE = 512;
+    const uint16_t        NUM_BANDS = 16;
+    ps_ptr<float>         window;
+    ps_ptr<float>         fft_in;
+    ps_ptr<float>         spectrum;
+    std::vector<uint32_t> sp_vec = {};
 };
 
 struct Biquad {
@@ -426,15 +435,13 @@ struct resampler_t {
     bool    hasLast = false; // First frame has no “last”
 };
 
-struct info_queue_t {
-    std::deque<ps_ptr<char>>          msg = {};
-    std::deque<ps_ptr<char>>          s = {};
-    std::deque<uint8_t>               e = {}; // event type
-    std::deque<int32_t>               arg1 = {};
-    std::deque<int32_t>               arg2 = {};
-    std::deque<std::vector<uint32_t>> vec = {}; // apic [pos, len, pos, len, pos, len, ....]
-
-    void reset() { *this = info_queue_t{}; }
+struct InfoItem {
+    ps_ptr<char>          msg;
+    ps_ptr<char>          s;
+    uint8_t               e = 0; // event type
+    int32_t               arg1 = 0;
+    int32_t               arg2 = 0;
+    std::vector<uint32_t> vec; // apic [pos, len, pos, len, pos, len, ....]
 };
 
 struct icy_items_t {

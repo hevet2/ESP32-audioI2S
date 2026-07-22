@@ -191,6 +191,7 @@ class RingBuffer {
     size_t        getBufsize() const;
     size_t        init();
     bool          isInitialized() { return m_init; };
+    void          clear();
     void          reset();
     size_t        freeSpace() const;
     size_t        bufferFilled() const;
@@ -244,10 +245,12 @@ class Audio {
         evt_image,
         evt_lyrics,
         evt_log,
+        evt_vu,
+        evt_spectrum,
     } event_t;
 
     // Audio event type descriptions
-    static constexpr std::array<const char*, 14> eventStr = {
+    static constexpr std::array<const char*, 16> eventStr = {
         "info",            // evt_info
         "id3data",         // evt_id3data
         "eof",             // evt_eof
@@ -262,6 +265,8 @@ class Audio {
         "cover_image",     // evt_image
         "lyrics",          // evt_lyrics
         "log",             // evt_log
+        "VU",              // evt_vu
+        "BANDS",           // evt_spectrum
     };
 
     typedef struct _msg { // used in info(audio_info_callback());
@@ -311,7 +316,6 @@ class Audio {
     uint32_t         getAudioCurrentTime();
     uint32_t         getAudioFilePosition();
     bool             setAudioFilePosition(uint32_t pos);
-    uint16_t         getVUlevel();
     uint32_t         inBufferFilled();  // returns the number of stored bytes in the inputbuffer
     uint32_t         inBufferFree();    // returns the number of free bytes in the inputbuffer
     uint32_t         getInBufferSize(); // returns the size of the inputbuffer in bytes
@@ -374,11 +378,13 @@ class Audio {
     uint32_t                 resampleI2Soutput(audiolib::resampler_t& resampler, int32_t* input, uint32_t inputSamples, int32_t* output);
     void                     cacheSamples();
     void                     playChunk();
-    void                     calculateVUlevel(int32_t* sample);
-    void                     processSpectrum();
+    void                     calculateVUlevel(int32_t* buff, size_t len);
+    void                     calculateSpectrum(int32_t* buff, size_t len);
+    void                     Gain(int32_t* buff, size_t len);
+    void                     stereo2mono(int32_t* buff, size_t len);
+    void                     IIR_filter(int32_t* buff, size_t len);
     void                     gain_ramp();
     void                     calculateVolumeLimits();
-    void                     Gain(int32_t* sample);
     void                     showstreamtitle(char* ml);
     bool                     parseContentType(ps_ptr<char> ct);
     bool                     parseHttpResponseHeader();
@@ -388,9 +394,7 @@ class Audio {
     esp_err_t                I2Sstop();
     void                     zeroI2Sbuff();
     void                     reconfigI2S();
-    void                     stereo2mono(int32_t* buff, uint16_t validSamples);
     void                     IIR_calculateCoefficients();
-    void                     IIR_filter(int32_t* iir_in);
     uint32_t                 streamavail() { return m_client ? m_client->available() : 0; }
     bool                     ts_parsePacket(uint8_t* packet, uint8_t* packetStart, uint8_t* packetLength);
     uint64_t                 getLastGranulePosition(uint8_t codec);
@@ -493,9 +497,7 @@ class Audio {
         uint16_t FREQ_PEAK_HZ = 1800;              // IIR Filter, peakingEQ
         uint16_t FREQ_HS_HZ = 6000;                // IIR Filter, highshelf
         float    QUALITY_SLOPE = 0.707;            // Quality (all shelfes)
-        uint16_t PEAK_HOLD_SAMPLES = 2000;         // VU_meter, (2000) ca. 20 ms @ 48 kHz
-        uint8_t  PEAK_RELEASE = 1;                 // VU_meter, Fall rate
-        bool     VU_LEVEL = true;                  // true: vu meter is enabled
+        bool     VU_LEVEL = false;                 // true: vu meter is enabled
         bool     IIR_FILTER = true;                // true: IIR filter (highshelf, bandpass, lowshelf) are enabled
         bool     SPECTRUM = false;                 // true: spectrum analyzer is enabled
         bool     VOLUME_CONTROL = true;            // true: volume and balance control is enabled
@@ -601,7 +603,9 @@ class Audio {
     bool           m_f_firstLoop = false;             // InitSequence in loop()
     bool           m_f_firstPlayCall = false;         // InitSequence for playAudioData
     bool           m_f_firstCacheSamplesCall = false; // InitSequence for cacheSamples
+    bool           m_f_first_vu_call = false;         // InitSequence for calculateVUlevel
     bool           m_f_firstChunkCall = false;        // InitSequence for playChunk
+    bool           m_f_first_fft_call = false;        // InitSequence for calculateSpectrum
     bool           m_f_ID3v1TagFound = false;         // ID3v1 tag found
     bool           m_f_chunked = false;               // Station provides chunked transfer
     bool           m_f_firstmetabyte = false;         // True if first metabyte (counter)
@@ -671,8 +675,21 @@ class Audio {
     audiolib::fft_items_t  m_fft_items;
     audiolib::i2s_items_t  m_i2s_items;
     audiolib::resampler_t  m_resampler;
-    audiolib::info_queue_t m_info_queue;
     audiolib::icy_items_t  m_icy_items;
+
+    struct info_queue_t {
+        std::deque<audiolib::InfoItem> queue;
+        void                           reset() { queue.clear(); }
+    } m_info_queue;
+
+    inline uint8_t sampleToVU(int32_t sample) {
+        uint32_t mag;
+        if (sample < 0)
+            mag = (uint32_t)(-(int64_t)sample);
+        else
+            mag = (uint32_t)sample;
+        return std::min<uint32_t>(mag >> 23, 255);
+    };
 
     // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
   public:
@@ -680,6 +697,10 @@ class Audio {
         std::lock_guard<std::mutex> lock(instance.mutex_info);
         if (!fmt) return false;
         if (!audio_info_callback) return false;
+        if (instance.m_info_queue.queue.size() == 1000) {
+            log_e("infoqueue is full");
+            return false;
+        }
 
         ps_ptr<char> result;
         result.assignf(fmt, std::forward<Args>(args)...);
@@ -713,37 +734,44 @@ class Audio {
             return std::nullopt;
         };
 
-        std::vector<uint32_t> v;
-        v.push_back(0);
-        instance.m_info_queue.msg.emplace_front(result);
-        instance.m_info_queue.s.emplace_front(eventStr[e]);
-        instance.m_info_queue.arg1.emplace_front(extract_last_number(result.c_get()).value_or(0));
-        instance.m_info_queue.arg2.emplace_front(0);
-        instance.m_info_queue.vec.emplace_front(v);
-        instance.m_info_queue.e.emplace_front((uint8_t)e);
+        audiolib::InfoItem item;
+        item.s = eventStr[e];
+        item.arg1 = extract_last_number(result.c_get()).value_or(0);
+        item.arg2 = 0;
+        item.e = (uint8_t)e;
+        item.msg = result;
+        instance.m_info_queue.queue.push_back(std::move(item));
         result.reset();
         return true;
     }
-
+    //--------------------------------------------------------------------------------------------------------------
     static bool info(Audio& instance, event_t e, std::vector<uint32_t>& v) {
         if (!audio_info_callback) return false;
+        if (instance.m_info_queue.queue.size() == 1000) {
+            log_e("infoqueue is full");
+            return false;
+        }
         std::lock_guard<std::mutex> lock(instance.mutex_info); // lock mutex
-        ps_ptr<char>                apic;
-        apic.assignf("APIC found at pos {}", v[0]);
-        // msg_t i;
-        // i.msg = apic.c_get();
-        // i.e = e;
-        // i.s = eventStr[e];
-        // i.i2s_num = instance.m_i2s_items.i2s_num;
-        // i.vec = v;
-        // audio_info_callback(i);
+        ps_ptr<char>                txt;
+        if (e == evt_image) {
+            txt.assignf("APIC found at pos {}", v[0]);
+        } else if (e == evt_vu) {
+            txt.assignf("l: {:03}, r: {:03}, pl: {:03}, pr: {:03}", v[0], v[1], v[2], v[3]);
+        } else if (e == evt_spectrum) {
+            txt.assignf("0...14: {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}, {:03}", v[0], v[1], v[2], v[3], v[4], v[5], v[6], v[7], v[8], v[9],
+                        v[10], v[11], v[12], v[13], v[14]);
+        } else { //
+            txt.assign("???");
+        }
 
-        instance.m_info_queue.msg.emplace_front(apic);
-        instance.m_info_queue.s.emplace_front(eventStr[e]);
-        instance.m_info_queue.arg1.emplace_front(0);
-        instance.m_info_queue.arg2.emplace_front(0);
-        instance.m_info_queue.vec.emplace_front(v);
-        instance.m_info_queue.e.emplace_front((uint8_t)e);
+        audiolib::InfoItem item;
+        item.s = eventStr[e];
+        item.arg1 = 0;
+        item.arg2 = 0;
+        item.vec = v;
+        item.e = (uint8_t)e;
+        item.msg = txt;
+        instance.m_info_queue.queue.push_back(std::move(item));
         return true;
     }
     //----------------------------------------------------------------------------------------------------------------------

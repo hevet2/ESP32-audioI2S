@@ -530,6 +530,8 @@ size_t RingBuffer::init() {
     return m_bufSize;
 }
 //----------------------------------------------------------------------------------------------------------------------------------------------------
+void RingBuffer::clear() {}
+//----------------------------------------------------------------------------------------------------------------------------------------------------
 void RingBuffer::reset() {
     m_readIndex = 0;
     m_writeIndex = 0;
@@ -734,6 +736,7 @@ Audio::~Audio() {
     i2s_channel_disable(m_i2s_tx_handle);
     i2s_del_channel(m_i2s_tx_handle);
     stopAudioTask();
+    dsps_fft2r_deinit_fc32();
     vSemaphoreDelete(mutex_audioTask);
     vSemaphoreDelete(mutex_audioTaskIsDecoding);
 }
@@ -832,6 +835,8 @@ void Audio::setDefaults() {
     m_f_firstPlayCall = true;         // InitSequence for playAudioData
     m_f_firstChunkCall = true;        // InitSequence for playChunk
     m_f_firstCacheSamplesCall = true; // InitSequence for cacheSamples
+    m_f_first_vu_call = true;         // InitSequence for calculateVUlevel
+    m_f_first_fft_call = true;        // InitSequence for calculateSpectrum
     m_f_firstLoop = true;
     m_f_unsync = false;   // set within ID3 tag but not used
     m_f_exthdr = false;   // ID3 extended header
@@ -2631,7 +2636,11 @@ int Audio::read_ID3_Header(uint8_t* data, size_t len) {
                 m_ID3Hdr.SYLT.text_encoding = syltBuff[0];
                 memcpy(m_ID3Hdr.SYLT.lang, syltBuff.get() + 1, 3);
                 m_ID3Hdr.SYLT.lang[3] = '\0';
-                info(*this, evt_info, "Lyrics: text_encoding: {}, language: {}, size {}", m_ID3Hdr.SYLT.text_encoding == 0 ? "ASCII" : m_ID3Hdr.SYLT.text_encoding == 3 ? "UTF-8" : "?", m_ID3Hdr.SYLT.lang, m_ID3Hdr.SYLT.size);
+                info(*this, evt_info, "Lyrics: text_encoding: {}, language: {}, size {}",
+                     m_ID3Hdr.SYLT.text_encoding == 0   ? "ASCII"
+                     : m_ID3Hdr.SYLT.text_encoding == 3 ? "UTF-8"
+                                                        : "?",
+                     m_ID3Hdr.SYLT.lang, m_ID3Hdr.SYLT.size);
                 m_ID3Hdr.SYLT.time_stamp_format = syltBuff[4];
                 m_ID3Hdr.SYLT.content_type = syltBuff[5];
 
@@ -2863,7 +2872,9 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
             if (!m_m4aHdr.progressive) {
                 m_m4aHdr.mdat_startPos = m_m4aHdr.headerSize + 8;
                 m_m4aHdr.sizeof_mdat = atom_size.to_uint32(16);
-                if (atom_struct) { AUDIO_LOG_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.mdat_startPos, m_m4aHdr.sizeof_mdat, m_m4aHdr.mdat_startPos + m_m4aHdr.sizeof_mdat); }
+                if (atom_struct) {
+                    AUDIO_LOG_WARN("atom {} @ {}, size: {}, ends @ {}", atom_name.c_get(), m_m4aHdr.mdat_startPos, m_m4aHdr.sizeof_mdat, m_m4aHdr.mdat_startPos + m_m4aHdr.sizeof_mdat);
+                }
                 info(*this, evt_info, "Audiofile is non progressive");
                 m_m4aHdr.retvalue += m_m4aHdr.sizeof_mdat;
                 m_m4aHdr.headerSize += m_m4aHdr.sizeof_mdat;
@@ -3346,11 +3357,13 @@ int Audio::read_M4A_Header(uint8_t* data, size_t len) {
         };
         const TagInfo tags[] = {
             // List of all usual tags
-            {{0xA9, 0x6E, 0x61, 0x6D}, "©nam", "Title"},        {{0xA9, 0x41, 0x52, 0x54}, "©ART", "Artist"},    {{0xA9, 0x61, 0x72, 0x74}, "©art", "Artist"},           {{0xA9, 0x61, 0x6C, 0x62}, "©alb", "Album"},
-            {{0xA9, 0x74, 0x6F, 0x6F}, "©too", "Encoder"},      {{0xA9, 0x63, 0x6D, 0x74}, "©cmt", "Comment"},   {{0xA9, 0x77, 0x72, 0x74}, "©wrt", "Composer"},         {{0x74, 0x6D, 0x70, 0x6F}, "tmpo", "Tempo (BPM)"},
-            {{0x74, 0x72, 0x6B, 0x6E}, "trkn", "Track-Number"}, {{0xA9, 0x64, 0x61, 0x79}, "©day", "Year"},      {{0x63, 0x70, 0x69, 0x6C}, "cpil", "Compilation-Flag"}, {{0x61, 0x41, 0x52, 0x54}, "aART", "Album Artist"},
-            {{0xA9, 0x67, 0x65, 0x6E}, "©gen", "Genre"},        {{0x63, 0x6F, 0x76, 0x72}, "covr", "Cover Art"}, {{0x64, 0x69, 0x73, 0x6B}, "disk", "Disk-Nummer"},      {{0xA9, 0x6C, 0x79, 0x72}, "©lyr", "Songtext"},
-            {{0xA9, 0x70, 0x72, 0x74}, "cprt", "Copyright"},    {{0x67, 0x6E, 0x72, 0x65}, "gnre", "Genre-ID"},  {{0x72, 0x74, 0x6E, 0x67}, "rtng", "Evaluation"},       {{0x70, 0x67, 0x61, 0x70}, "pgap", "Gapless Playback"},
+            {{0xA9, 0x6E, 0x61, 0x6D}, "©nam", "Title"},      {{0xA9, 0x41, 0x52, 0x54}, "©ART", "Artist"},           {{0xA9, 0x61, 0x72, 0x74}, "©art", "Artist"},
+            {{0xA9, 0x61, 0x6C, 0x62}, "©alb", "Album"},      {{0xA9, 0x74, 0x6F, 0x6F}, "©too", "Encoder"},          {{0xA9, 0x63, 0x6D, 0x74}, "©cmt", "Comment"},
+            {{0xA9, 0x77, 0x72, 0x74}, "©wrt", "Composer"},   {{0x74, 0x6D, 0x70, 0x6F}, "tmpo", "Tempo (BPM)"},      {{0x74, 0x72, 0x6B, 0x6E}, "trkn", "Track-Number"},
+            {{0xA9, 0x64, 0x61, 0x79}, "©day", "Year"},       {{0x63, 0x70, 0x69, 0x6C}, "cpil", "Compilation-Flag"}, {{0x61, 0x41, 0x52, 0x54}, "aART", "Album Artist"},
+            {{0xA9, 0x67, 0x65, 0x6E}, "©gen", "Genre"},      {{0x63, 0x6F, 0x76, 0x72}, "covr", "Cover Art"},        {{0x64, 0x69, 0x73, 0x6B}, "disk", "Disk-Nummer"},
+            {{0xA9, 0x6C, 0x79, 0x72}, "©lyr", "Songtext"},   {{0xA9, 0x70, 0x72, 0x74}, "cprt", "Copyright"},        {{0x67, 0x6E, 0x72, 0x65}, "gnre", "Genre-ID"},
+            {{0x72, 0x74, 0x6E, 0x67}, "rtng", "Evaluation"}, {{0x70, 0x67, 0x61, 0x70}, "pgap", "Gapless Playback"},
         };
         const size_t tags_count = sizeof(tags) / sizeof(tags[0]); // Number of tags
 
@@ -3753,11 +3766,6 @@ void Audio::cacheSamples() {
 
     //------------------------------------------------------------------------------------------------------------------------------------------------
     if (m_caSa.sourceWordsConsumed == 0) {
-        //  audio_process_raw_samples(m_outBuff.get(), m_validSamples);
-        //------------------------------------------------------------------------------------------
-        if (settings.SPECTRUM) processSpectrum();
-        if (m_f_forceMono) stereo2mono(m_outBuff.get(), m_validSamples);
-        //------------------------------------------------------------------------------------------
         if (m_output_sr && m_output_sr != m_i2s_items.sampleRate) {
             m_validSamples = resampleI2Soutput(m_resampler, m_outBuff.get(), m_validSamples, m_resamplesBuff.get()); // have new amount of samples
             sourceBuff = m_resamplesBuff.get();
@@ -3794,32 +3802,37 @@ void Audio::playChunk() {
     bool continueI2S = true;
     m_plCh.err = ESP_OK;
 
-    //------------------------------------------------------------------------------------------------------
-    // RingBuffer -> I2S
-    //------------------------------------------------------------------------------------------------------
-
     if (SamplesBuff.bufferFilled()) {
         if (m_dmaFreeDesc.load(std::memory_order_acquire) > settings.DMA_DESC_NUM) m_dmaFreeDesc = 0; // empty run
 
-        while (m_dmaFreeDesc.load(std::memory_order_acquire) > 0) {
+        while (m_dmaFreeDesc.load(std::memory_order_acquire) > 0) { // m_dmaFreeDesc is atomic!
 
+            //------------------------------------------------------------------------------------------------------
+            // RingBuffer -> m_i2sWorkBuff
+            //------------------------------------------------------------------------------------------------------
             size_t readWords = std::min(SamplesBuff.bufferFilled(), m_work_words);
             readWords &= ~static_cast<size_t>(1);
             if (readWords == 0) break;
             SamplesBuff.peek(m_i2sWorkBuff.get(), readWords);
-            //-----------------------------------------------------------------------------------------------------------------------------------------
+            //-------------------------------------------------------------------------------------------------------
+            // samples manipulation
+            //-------------------------------------------------------------------------------------------------------
             audio_process_raw_samples(m_i2sWorkBuff.get(), readWords);
-            const bool applyGain = settings.VOLUME_CONTROL && (m_audio_items.limiter[LEFTCHANNEL] != 1.0f || m_audio_items.limiter[RIGHTCHANNEL] != 1.0f);
-            for (int i = 0; i < readWords / 2; i++) {
-                if (settings.VU_LEVEL) calculateVUlevel(&m_i2sWorkBuff[i * 2]);
-                if (settings.IIR_FILTER) IIR_filter(&m_i2sWorkBuff[i * 2]);
-                if (applyGain) Gain(&m_i2sWorkBuff[i * 2]);
-            }
+
+            if (settings.VU_LEVEL) calculateVUlevel(m_i2sWorkBuff.get(), readWords);
+            if (settings.SPECTRUM) calculateSpectrum(m_i2sWorkBuff.get(), readWords);
+            if (settings.IIR_FILTER) IIR_filter(m_i2sWorkBuff.get(), readWords);
+            if (m_f_forceMono) stereo2mono(m_i2sWorkBuff.get(), readWords);
+            if (settings.VOLUME_CONTROL) Gain(m_i2sWorkBuff.get(), readWords);
+
             audio_process_i2s(m_i2sWorkBuff.get(), (int32_t)readWords, &continueI2S);
-            //-----------------------------------------------------------------------------------------------------------------------------------------
+            //--------------------------------------------------------------------------------------------------------
+            // m_i2sWorkBuff -> I2S
+            //--------------------------------------------------------------------------------------------------------
+
             size_t bytesConsumed = 0;
             if (continueI2S) {
-                m_plCh.err = i2s_channel_write(m_i2s_tx_handle, m_i2sWorkBuff.get(), readWords * sizeof(int32_t), &bytesConsumed, 5);
+                m_plCh.err = i2s_channel_write(m_i2s_tx_handle, m_i2sWorkBuff.get(), readWords * sizeof(int32_t), &bytesConsumed, 10);
             } else {
                 bytesConsumed = readWords * sizeof(int32_t);
             }
@@ -6399,37 +6412,13 @@ bool Audio::setPinout(uint8_t BCLK, uint8_t LRC, uint8_t DOUT, int8_t MCLK) {
     m_outBuff.alloc_array(m_outbuffSize, "m_outBuff");
     m_resamplesBuff.alloc_array(m_resamplesBuffSize, "m_resamplesBuff");
     m_i2sWorkBuff.alloc_array(m_work_words, "i2sWorkBuff");
-    vu_delay_frames = m_i2s_chan_cfg.dma_desc_num * m_i2s_chan_cfg.dma_frame_num;
-    vu_delay_frames += 1;
-    m_vu_items.delay_buffer_size = vu_delay_frames;
-    m_vu_items.delay_line_index = 0;
-
-    m_vu_items.delay_l.alloc_array(vu_delay_frames, "delay_l");
-    m_vu_items.delay_r.alloc_array(vu_delay_frames, "delay_r");
-    m_fft_items.buffer.alloc_array(m_fft_items.SIZE, "buffer");
-    m_fft_items.window.alloc_array(m_fft_items.SIZE, "window");
-    m_fft_items.work.alloc_array(m_fft_items.SIZE * 2, "work");
     m_metadataBuff.alloc(4096 + 1, "m_metadataBuff");   // max 4096 + 1 for null terminator, just to make library code 'safe'
     m_httpRespHdrBuff.alloc(4096, "m_httpRespHdrBuff"); // enough space to store http response header
 
-    if (!m_outBuff.valid() || !m_vu_items.delay_l.valid() || !m_vu_items.delay_r.valid() || !m_resamplesBuff.valid() || !m_fft_items.buffer.valid() || !m_fft_items.buffer.valid() || !m_fft_items.work.valid()) {
+    if (!m_outBuff.valid() || !m_resamplesBuff.valid() || !m_i2sWorkBuff.valid() || !m_metadataBuff.valid() || !m_httpRespHdrBuff.valid()) {
         result = false;
         goto exit;
     }
-
-    //---------------------------- FFT INIT-----------------------------------------
-    for (int i = 0; i < m_fft_items.SIZE; i++) { // Hann window
-        m_fft_items.window[i] = 0.5f * (1.0f - cosf(2.0f * M_PI * i / (m_fft_items.SIZE - 1)));
-    }
-
-    if (dsps_fft2r_init_fc32(nullptr, m_fft_items.SIZE) == ESP_OK) {
-        m_fft_items.initialized = true;
-    } else {
-        AUDIO_LOG_ERROR("FFT init failed (size={})", m_fft_items.SIZE);
-        result = false;
-        goto exit;
-    }
-    //-----------------------------------------------------------------------------
 
     I2Sstop();
     if (i2s_channel_reconfig_std_gpio(m_i2s_tx_handle, &gpio_cfg) != ESP_OK) {
@@ -6813,95 +6802,116 @@ void Audio::reconfigI2S() {
     m_dmaFreeDesc = settings.DMA_DESC_NUM;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void Audio::calculateVUlevel(int32_t* sample) { // Envelope-Follower
+void Audio::calculateVUlevel(int32_t* buff, size_t len) {
 
-    uint32_t DELAY_BUFFER_SIZE = m_vu_items.delay_buffer_size;
-    if (DELAY_BUFFER_SIZE < 2) DELAY_BUFFER_SIZE = 2;
-
-    uint32_t delayFrames = m_i2s_chan_cfg.dma_desc_num * m_i2s_chan_cfg.dma_frame_num; // Runtime in I2S-DMA
-    delayFrames += SamplesBuff.bufferFilled() / 2;                                     // add current SamplesBuff latency (words -> frames)
-    if (delayFrames >= DELAY_BUFFER_SIZE) delayFrames = DELAY_BUFFER_SIZE - 1;
-
-    // delay line
-    m_vu_items.delay_l[m_vu_items.delay_line_index] = sample[LEFTCHANNEL];
-    m_vu_items.delay_r[m_vu_items.delay_line_index] = sample[RIGHTCHANNEL];
-    m_vu_items.delay_line_index++;
-    if (m_vu_items.delay_line_index == DELAY_BUFFER_SIZE) m_vu_items.delay_line_index = 0;
-
-    int32_t pos = (int32_t)m_vu_items.delay_line_index - 1 - (int32_t)delayFrames;
-    while (pos < 0) pos += DELAY_BUFFER_SIZE;
-
-    // FFT buffer
-    float mono = 0.5f * (float)((m_vu_items.delay_l[pos] >> 20) + (m_vu_items.delay_r[pos] >> 20));
-
-    // --- FFT analyzer AGC ---
-    constexpr float TARGET = 0.1f; // desired RMS amplitude
-    constexpr float ATTACK = 0.05f;
-    constexpr float RELEASE_FFT = 0.005f;
-
-    float level = fabsf(mono);
-
-    if (level > 1e-6f) {
-        float desired = TARGET / level;
-        if (desired < m_fft_items.gain)
-            m_fft_items.gain += ATTACK * (desired - m_fft_items.gain);
-        else
-            m_fft_items.gain += RELEASE_FFT * (desired - m_fft_items.gain);
-    }
-    if (fabsf(mono) < 1e-4f) mono = 0.0f;
-    mono *= m_fft_items.gain;
-
-    m_fft_items.buffer[m_fft_items.buffer_index] = mono;
-    m_fft_items.buffer_index++;
-    if (m_fft_items.buffer_index == m_fft_items.SIZE) m_fft_items.buffer_index = 0;
-
-    uint8_t l = 0, r = 0;
-    l = abs(m_vu_items.delay_l[pos] >> 23);
-    r = abs(m_vu_items.delay_r[pos] >> 23);
-
-    // Attack immediately
-    constexpr float RELEASE = 1.0f; // the bigger, the more sluggish
-    if (l > m_vu_items.left) {
-        m_vu_items.left = l;
-    } else if (m_vu_items.left > RELEASE) {
-        m_vu_items.left -= RELEASE;
-    }
-    if (r > m_vu_items.right) {
-        m_vu_items.right = r;
-    } else if (m_vu_items.right > RELEASE) {
-        m_vu_items.right -= RELEASE;
-    }
-
-    // LEFT
-    if (m_vu_items.left > m_vu_items.left_peak) {
-        m_vu_items.left_peak = m_vu_items.left;
-        m_vu_items.left_hold = settings.PEAK_HOLD_SAMPLES;
-    } else {
-        if (m_vu_items.left_hold > 0) {
-            m_vu_items.left_hold--;
-        } else if (m_vu_items.left_peak > settings.PEAK_RELEASE) {
-            m_vu_items.left_peak -= settings.PEAK_RELEASE;
+    auto newVal = [&](uint8_t* display, uint8_t measured, uint8_t max, uint8_t attackStep, uint8_t releaseStep, uint8_t hold, uint8_t* tmpHold) -> void {
+        if (measured > *display) { // attack
+            *tmpHold = hold;
+            *display = std::min<uint8_t>(min(*display + attackStep, 255), max);
+        } else { // release left
+            if (*tmpHold == 0) {
+                uint8_t diff = *display - measured;
+                *display -= std::min<uint8_t>(diff, releaseStep);
+            } else {
+                (*tmpHold)--;
+            }
         }
+    };
+
+    uint8_t bars_attack_step = 200; // bars rising steps
+    uint8_t bars_release_step = 30; // bars falling steps
+    uint8_t peak_attack_step = 200; // peak rising steps
+    uint8_t peak_release_step = 10; // peak falling steps
+    uint8_t bars_hold_cycles = 1;   // bars hold_cycles * 20ms
+    uint8_t peak_hold_cycles = 2;   // peak hold_cycles * 20ms
+
+    if (m_f_first_vu_call) {
+        m_f_first_vu_call = false;
+        m_vu_items.maxLeft = 0;
+        m_vu_items.maxRight = 0;
+        m_vu_items.sumL = 0;
+        m_vu_items.sumR = 0;
+        m_vu_items.samps_count = 0;
+        m_vu_items.barsHoldLeft_tmp = 0;
+        m_vu_items.barsHoldRight_tmp = 0;
+        m_vu_items.peakHoldLeft_tmp = 0;
+        m_vu_items.peakHoldRight_tmp = 0;
+        m_vu_items.samps_50ms = m_i2s_items.sampleRate / 20; // every 50ms one output
+        m_vu_items.delay_bars_left.calloc(1 + (m_i2s_chan_cfg.dma_desc_num * m_i2s_chan_cfg.dma_frame_num) / m_vu_items.samps_50ms);
+        m_vu_items.delay_bars_right.calloc(1 + (m_i2s_chan_cfg.dma_desc_num * m_i2s_chan_cfg.dma_frame_num) / m_vu_items.samps_50ms);
+        m_vu_items.delay_bars_left.fifo_reset();
+        m_vu_items.delay_bars_right.fifo_reset();
+        m_vu_items.delay_peak_left.calloc(1 + (m_i2s_chan_cfg.dma_desc_num * m_i2s_chan_cfg.dma_frame_num) / m_vu_items.samps_50ms);
+        m_vu_items.delay_peak_right.calloc(1 + (m_i2s_chan_cfg.dma_desc_num * m_i2s_chan_cfg.dma_frame_num) / m_vu_items.samps_50ms);
+        m_vu_items.delay_peak_left.fifo_reset();
+        m_vu_items.delay_peak_right.fifo_reset();
+        m_vu_items.lrvec.clear();
+        for (int i = 0; i < 4; i++) m_vu_items.lrvec.push_back(0);
+        m_vu_items.vuCurve.alloc(256, "vuCurve");
+        for (int i = 0; i < 256; i++) { // Compression characteristic curve
+            double x = i / 255.0;
+            int    y = std::lround(255.0 * std::pow(x, 0.5)); // curve: 1.0 linear, 0.8 soft, 0.7 classic, 0.5 punchy
+            m_vu_items.vuCurve[i] = y;
+        }
+        info(*this, evt_vu, m_vu_items.lrvec);
     }
 
-    // RIGHT
-    if (m_vu_items.right > m_vu_items.right_peak) {
-        m_vu_items.right_peak = m_vu_items.right;
-        m_vu_items.right_hold = settings.PEAK_HOLD_SAMPLES;
-    } else {
-        if (m_vu_items.right_hold > 0) {
-            m_vu_items.right_hold--;
-        } else if (m_vu_items.right_peak > settings.PEAK_RELEASE) {
-            m_vu_items.right_peak -= settings.PEAK_RELEASE;
+    if (m_decoder) {
+
+        for (int i = 0; i < len / 2; i++) {      // always stereo
+            uint8_t l = sampleToVU(buff[i * 2]); // int32_t to uint8_t
+            uint8_t r = sampleToVU(buff[i * 2 + 1]);
+            m_vu_items.sumL += l;
+            m_vu_items.sumR += r;
+            if (l > m_vu_items.maxLeft) m_vu_items.maxLeft = l;
+            if (r > m_vu_items.maxRight) m_vu_items.maxRight = r;
+
+            m_vu_items.samps_count++;
+            if (m_vu_items.samps_count >= m_vu_items.samps_50ms) { // every 20ms
+
+                m_vu_items.measuredLeft = m_vu_items.sumL / m_vu_items.samps_count;
+                m_vu_items.measuredRight = m_vu_items.sumR / m_vu_items.samps_count;
+
+                //--------------------------------------------------------------------------------------------------
+                newVal(&m_vu_items.displayLeft, m_vu_items.measuredLeft, m_vu_items.maxLeft, bars_attack_step, bars_release_step, bars_hold_cycles, &m_vu_items.barsHoldLeft_tmp);
+                newVal(&m_vu_items.displayRight, m_vu_items.measuredRight, m_vu_items.maxRight, bars_attack_step, bars_release_step, bars_hold_cycles, &m_vu_items.barsHoldRight_tmp);
+
+                newVal(&m_vu_items.peakLeft, m_vu_items.measuredLeft, m_vu_items.maxLeft, peak_attack_step, peak_release_step, peak_hold_cycles, &m_vu_items.peakHoldLeft_tmp);
+                newVal(&m_vu_items.peakRight, m_vu_items.measuredRight, m_vu_items.maxRight, peak_attack_step, peak_release_step, peak_hold_cycles, &m_vu_items.peakHoldRight_tmp);
+                //--------------------------------------------------------------------------------------------------
+
+                // output
+                m_vu_items.lrvec[0] = m_vu_items.vuCurve[m_vu_items.delay_bars_left.fifo(m_vu_items.displayLeft)];
+                m_vu_items.lrvec[1] = m_vu_items.vuCurve[m_vu_items.delay_bars_right.fifo(m_vu_items.displayRight)];
+                m_vu_items.lrvec[2] = m_vu_items.vuCurve[m_vu_items.delay_peak_left.fifo(m_vu_items.peakLeft)];
+                m_vu_items.lrvec[3] = m_vu_items.vuCurve[m_vu_items.delay_peak_right.fifo(m_vu_items.peakRight)];
+                // AUDIO_LOG_INFO("{:03} {:03} {:03} {:03}", m_vu_items.lrvec[0], m_vu_items.lrvec[1], m_vu_items.lrvec[2], m_vu_items.lrvec[3]);
+                info(*this, evt_vu, m_vu_items.lrvec);
+
+                m_vu_items.sumL = 0;
+                m_vu_items.sumR = 0;
+                m_vu_items.maxLeft = 0;
+                m_vu_items.maxRight = 0;
+                m_vu_items.samps_count = 0;
+            }
         }
+    } else { // !m_decoder, fall only
+        //--------------------------------------------------------------------------------------------------
+        newVal(&m_vu_items.displayLeft, 0, 0, bars_attack_step, bars_release_step, bars_hold_cycles, &m_vu_items.barsHoldLeft_tmp);
+        newVal(&m_vu_items.displayRight, 0, 0, bars_attack_step, bars_release_step, bars_hold_cycles, &m_vu_items.barsHoldRight_tmp);
+
+        newVal(&m_vu_items.peakLeft, 0, 0, peak_attack_step, peak_release_step, peak_hold_cycles, &m_vu_items.peakHoldLeft_tmp);
+        newVal(&m_vu_items.peakRight, 0, 0, peak_attack_step, peak_release_step, peak_hold_cycles, &m_vu_items.peakHoldRight_tmp);
+        //--------------------------------------------------------------------------------------------------
+
+        // output
+        m_vu_items.lrvec[0] = m_vu_items.vuCurve[m_vu_items.delay_bars_left.fifo(m_vu_items.displayLeft)];
+        m_vu_items.lrvec[1] = m_vu_items.vuCurve[m_vu_items.delay_bars_right.fifo(m_vu_items.displayRight)];
+        m_vu_items.lrvec[2] = m_vu_items.vuCurve[m_vu_items.delay_peak_left.fifo(m_vu_items.peakLeft)];
+        m_vu_items.lrvec[3] = m_vu_items.vuCurve[m_vu_items.delay_peak_right.fifo(m_vu_items.peakRight)];
+        info(*this, evt_vu, m_vu_items.lrvec);
+        // AUDIO_LOG_INFO("{:03} {:03} {:03} {:03}", m_vu_items.lrvec[0], m_vu_items.lrvec[1], m_vu_items.lrvec[2], m_vu_items.lrvec[3]);
     }
-}
-// —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-uint16_t Audio::getVUlevel() {
-    if (!m_f_running) return 0;
-    AUDIO_LOG_DEBUG("{}", m_vu_items.left);
-    // avg 0 ... 255                                                                                  MSB          LSB
-    return ((uint8_t)m_vu_items.right_peak << 8) + (uint8_t)m_vu_items.left_peak; // returns  rrrrrrrrllllllll
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 void Audio::setTone(float gainLowPass, float gainBandPass, float gainHighPass) {
@@ -7031,120 +7041,121 @@ void Audio::calculateVolumeLimits() { // is calculated when the volume or balanc
     AUDIO_LOG_DEBUG("m_limiter[LEFTCHANNEL] {}, m_limiter[RIGHTCHANNEL] {}", m_audio_items.limiter[LEFTCHANNEL], m_audio_items.limiter[RIGHTCHANNEL]);
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void Audio::processSpectrum() {
+void Audio::calculateSpectrum(int32_t* buff, size_t len) {
+    /*
+                | Area (Hz)    | Title
+          ------+--------------+-----------
+          0     | 86…172       | 125 Hz
+          1     | 258…344      | 300 Hz
+          2     | 430…602      | 500 Hz
+          3     | 689…947      | 800 Hz
+          4     | 1033…1378    | 1.2 kHz
+          5     | 1464…1981    | 1.7 kHz
+          6     | 2067…2756    | 2.4 kHz
+          7     | 2842…3789    | 3.3 kHz
+          8     | 3875…5167    | 4.5 kHz
+          9     | 5253…6890    | 6.0 kHz
+          10    | 6976…8957    | 8 kHz
+          11    | 9043…11357   | 10 kHz
+          12    | 11444…14118  | 13 kHz
+          13    | 14205…17222  | 16 kHz
+          14    | 17308…19638  | 18 kHz
+          15    | 19724…21964  | 20 kHz (not used NYQUIST!)
+    */
+    struct FFTBand {
+        uint16_t firstBin;
+        uint16_t lastBin;
+        float    invCount;
+    };
+    const FFTBand fftBands[16] = {{1, 2, 1.0f / 2.0f},      {3, 4, 1.0f / 2.0f},      {5, 7, 1.0f / 3.0f},      {8, 11, 1.0f / 4.0f},    {12, 16, 1.0f / 5.0f},   {17, 23, 1.0f / 7.0f},
+                                  {24, 32, 1.0f / 9.0f},    {33, 44, 1.0f / 12.0f},   {45, 60, 1.0f / 16.0f},   {61, 80, 1.0f / 20.0f},  {81, 104, 1.0f / 24.0f}, {105, 132, 1.0f / 28.0f},
+                                  {133, 164, 1.0f / 32.0f}, {165, 200, 1.0f / 36.0f}, {201, 228, 1.0f / 28.0f}, {229, 255, 1.0f / 27.0f}};
 
-    // --- 10 Hz update ---
-    uint32_t now = millis();
-    if (now - m_fft_items.last_ms < 100) return;
-    m_fft_items.last_ms = now;
+    constexpr float DB_MIN = 40.0f;
+    constexpr float DB_MAX = 125.0f;
+    float           pw[16];
 
-    // --- Window + real → complex ---
-    for (int i = 0; i < m_fft_items.SIZE; i++) {
-        m_fft_items.work[2 * i] = m_fft_items.buffer[i] * m_fft_items.window[i];
-        m_fft_items.work[2 * i + 1] = 0.0f;
+    if (m_f_first_fft_call) {
+        m_f_first_fft_call = false;
+        m_fft_items.count = 0;
+        m_fft_items.samps_100ms = m_i2s_items.sampleRate / 10; // every 100ms one output
+        if (!m_fft_items.samples_buffer.valid()) { m_fft_items.samples_buffer.alloc_array(m_fft_items.FFT_SIZE, "samples_buffer"); }
+        m_fft_items.samples_buffer.clear();
+        m_fft_items.samples_buffer_index = 0;
+        if (!m_fft_items.window.valid()) {
+            m_fft_items.window.alloc_array(m_fft_items.FFT_SIZE, "fft_window");
+            for (uint16_t i = 0; i < m_fft_items.FFT_SIZE; i++) { m_fft_items.window[i] = 0.5f * (1.0f - cosf(2.0f * PI * i / (m_fft_items.FFT_SIZE - 1))); }
+        }
+        if (!m_fft_items.fft_in.valid()) { m_fft_items.fft_in.alloc_array(m_fft_items.FFT_SIZE * 2, "fft_in"); }
+        if (!m_fft_items.spectrum.valid()) { m_fft_items.spectrum.alloc_array(m_fft_items.NUM_BANDS, "spectrum"); }
+        m_fft_items.sp_vec.clear();
+        for (int i = 0; i < 16; i++) m_fft_items.sp_vec.push_back(0);
+        esp_err_t err = dsps_fft2r_init_fc32(nullptr, m_fft_items.FFT_SIZE);
+        if (err != ESP_OK) AUDIO_LOG_ERROR("err {}", err);
     }
 
-    // --- FFT ---
-    dsps_fft2r_fc32(m_fft_items.work.get(), m_fft_items.SIZE);
-    dsps_bit_rev_fc32(m_fft_items.work.get(), m_fft_items.SIZE);
-    dsps_cplx2reC_fc32(m_fft_items.work.get(), m_fft_items.SIZE);
+    for (int i = 0; i < len / 2; i++) { // always stereo
+        int16_t s = ((buff[i * 2] >> 17) + (buff[i * 2 + 1] >> 17));
+        m_fft_items.samples_buffer[m_fft_items.samples_buffer_index++] = s;
+        if (m_fft_items.samples_buffer_index == m_fft_items.FFT_SIZE) {
+            //----------------------------------------------------------------------------------
+            // FFT
+            //----------------------------------------------------------------------------------
+            for (uint16_t i = 0; i < m_fft_items.FFT_SIZE; i++) {
+                m_fft_items.fft_in[2 * i] = (float)m_fft_items.samples_buffer[i] * m_fft_items.window[i]; // Realteil
+                m_fft_items.fft_in[2 * i + 1] = 0.0f;                                                     // Imaginärteil
+            }
+            dsps_fft2r_fc32(m_fft_items.fft_in.get(), m_fft_items.FFT_SIZE);
+            // Bit-Reversal
+            dsps_bit_rev_fc32(m_fft_items.fft_in.get(), m_fft_items.FFT_SIZE);
+            // Ausgabe in normales Frequenzformat bringen
+            dsps_cplx2reC_fc32(m_fft_items.fft_in.get(), m_fft_items.FFT_SIZE);
+            //----------------------------------------------------------------------------------
+            memmove(m_fft_items.samples_buffer.get(), m_fft_items.samples_buffer.get() + (m_fft_items.FFT_SIZE / 2), (m_fft_items.FFT_SIZE / 2) * sizeof(int16_t));
+            m_fft_items.samples_buffer_index = m_fft_items.FFT_SIZE / 2;
 
-    const float bin_hz = (float)m_i2s_items.sampleRate / m_fft_items.SIZE;
-    const float norm = 2.0f / m_fft_items.SIZE;
+            m_fft_items.count += m_fft_items.FFT_SIZE / 2;
+            if (m_fft_items.count >= m_fft_items.samps_100ms) {
+                m_fft_items.count -= m_fft_items.samps_100ms;
 
-    // --- 5 internal bands ---
-    float band[m_fft_items.BANDS] = {0};
-    int   bins[m_fft_items.BANDS] = {0};
+                for (int b = 0; b < m_fft_items.NUM_BANDS; b++) {
+                    float power = 0.0f;
 
-    for (int i = 1; i < m_fft_items.SIZE / 2; i++) {
+                    for (int i = fftBands[b].firstBin; i <= fftBands[b].lastBin; i++) {
+                        float re = m_fft_items.fft_in[2 * i];
+                        float im = m_fft_items.fft_in[2 * i + 1];
+                        float mag2 = re * re + im * im;
+                        power += mag2;
+                    }
 
-        float re = m_fft_items.work[2 * i];
-        float im = m_fft_items.work[2 * i + 1];
-        float mag = sqrtf(re * re + im * im) * norm;
-        float f = i * bin_hz;
+                    power *= fftBands[b].invCount;
+                    float db = 10.0f * log10f(power + 1.0f);
+                    db = std::clamp(db, DB_MIN, DB_MAX);
+                    float x = (db - DB_MIN) / (DB_MAX - DB_MIN);
+                    m_fft_items.sp_vec[b] = uint8_t(x * 255.0f + 0.5f);
+                }
+                info(*this, evt_spectrum, m_fft_items.sp_vec);
 
-        int b = -1;
-        if (f < 250)
-            b = 0;
-        else if (f < 400)
-            b = -1;
-        else if (f < 700)
-            b = 1;
-        else if (f < 1000)
-            b = -1;
-        else if (f < 1550)
-            b = 2;
-        else if (f < 2200)
-            b = -1;
-        else if (f < 4250)
-            b = 3;
-        else if (f < 6300)
-            b = -1;
-        else if (f < 11150)
-            b = 4;
-        else if (f < 16000)
-            b = 5;
-        else
-            b = -1;
-
-        if (b >= 0) {
-            band[b] += mag * mag;
-            bins[b]++;
+                // static int j = 0;
+                // j++;
+                // if (j % 100 == 0) {
+                //     for (int i = 0; i < m_fft_items.NUM_BANDS; i++) { AUDIO_LOG_WARN("{:03} {:.1f}", i, m_fft_items.spectrum[i]); }
+                //     AUDIO_LOG_WARN("");
+                // }
+            }
         }
     }
-
-    // --- RMS + weighting ---
-    for (int i = 0; i < m_fft_items.BANDS; i++) {
-        if (bins[i])
-            band[i] = sqrtf(band[i] / bins[i]);
-        else
-            band[i] = 0.0f;
-    }
-
-    // band weighting (psychoacoustic / UI)
-    band[0] *= 0.5f;
-    band[1] *= 0.8f;
-    band[2] *= 3.0f;
-    band[3] *= 2.8f;
-    band[4] *= 1.5f;
-    band[5] *= 1.5f;
-
-    // log scale
-    for (int i = 0; i < m_fft_items.BANDS; i++) { band[i] = log10f(band[i] + 1e-6f); }
-
-    // --- temporal smoothing (only displayed bands) ---
-    auto smooth = [](float old, float in) {
-        constexpr float ATTACK = 0.6f;
-        constexpr float RELEASE = 0.6f;
-        return (in > old) ? old + ATTACK * (in - old) : old + RELEASE * (in - old);
-    };
-
-    for (int i = 0; i < m_fft_items.BANDS; i++) { m_fft_items.spec_smooth[i] = smooth(m_fft_items.spec_smooth[i], band[i]); }
-
-    // --- map to 0..255 using dB window ---
-    constexpr float DB_MIN = -50.0f;
-    constexpr float DB_MAX = 0.0f;
-
-    for (int i = 0; i < m_fft_items.BANDS; i++) {
-
-        float db = m_fft_items.spec_smooth[i] * 20.0f;
-
-        if (db < DB_MIN) db = DB_MIN;
-        if (db > DB_MAX) db = DB_MAX;
-
-        float norm = (db - DB_MIN) / (DB_MAX - DB_MIN);
-
-        m_fft_items.spectrum[i] = (uint8_t)(norm * 255.0f);
-    }
-    //    AUDIO_LOG_INFO("{:4}, {:4}, {:4}, {:4}, {:4}, {:4} ", m_fft_items.spectrum[0], m_fft_items.spectrum[1],  m_fft_items.spectrum[2],  m_fft_items.spectrum[3],  m_fft_items.spectrum[4],
-    //    m_fft_items.spectrum[3]);
 }
+
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void Audio::Gain(int32_t* sample) {
+void Audio::Gain(int32_t* buff, size_t len) {
     /* important: these multiplications must all be signed ints, or the result will be invalid */
-    int32_t* s32 = (int32_t*)sample;
-    s32[LEFTCHANNEL] *= m_audio_items.limiter[LEFTCHANNEL];
-    s32[RIGHTCHANNEL] *= m_audio_items.limiter[RIGHTCHANNEL];
+    int32_t* s32;
+    for (int i = 0; i < len / 2; i++) {
+        s32 = buff + (i * 2);
+        s32[LEFTCHANNEL] *= m_audio_items.limiter[LEFTCHANNEL];
+        s32[RIGHTCHANNEL] *= m_audio_items.limiter[RIGHTCHANNEL];
+    }
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 uint32_t Audio::inBufferFilled() {
@@ -7162,9 +7173,9 @@ uint32_t Audio::getInBufferSize() {
     return InBuff.getBufsize();
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void Audio::stereo2mono(int32_t* buff, uint16_t validSamples) {
+void Audio::stereo2mono(int32_t* buff, size_t len) {
 
-    for (uint16_t i = 0; i < validSamples * 2; i += 2) {
+    for (uint16_t i = 0; i < len * 2; i += 2) {
         int64_t l = buff[i];
         int64_t r = buff[i + 1];
         int32_t m = (int32_t)((l + r) >> 1); // average, without overflow
@@ -7214,26 +7225,28 @@ void Audio::IIR_calculateCoefficients() { // Infinite Impulse Response (IIR) fil
     dsps_biquad_gen_peakingEQ_f32(m_audio_items.coeffs[PEAKINGEQ], normFreqPEQ, m_audio_items.gain_peq_db, QS); // my own calc.
     dsps_biquad_gen_highShelf_f32(m_audio_items.coeffs[HIFGSHELF], normFreqHS, m_audio_items.gain_hs_db, QS);
 
-    AUDIO_LOG_DEBUG("\n([{}, {}, {}], [1.0, {}, {}]), # LOWSHELF\n([{},  {},  {} ], [1.0, {},  {} ]), # PEAKINGEQ\n([{}, {}, {}], [1.0, {}, {}]), # HIGHSHELF\n", m_audio_items.coeffs[0][0], m_audio_items.coeffs[0][1], m_audio_items.coeffs[0][2], m_audio_items.coeffs[0][3],
-                    m_audio_items.coeffs[0][4], m_audio_items.coeffs[1][0], m_audio_items.coeffs[1][1], m_audio_items.coeffs[1][2], m_audio_items.coeffs[1][3], m_audio_items.coeffs[1][4], m_audio_items.coeffs[2][0], m_audio_items.coeffs[2][1], m_audio_items.coeffs[2][2], m_audio_items.coeffs[2][3],
-                    m_audio_items.coeffs[2][4]);
+    AUDIO_LOG_DEBUG("\n([{}, {}, {}], [1.0, {}, {}]), # LOWSHELF\n([{},  {},  {} ], [1.0, {},  {} ]), # PEAKINGEQ\n([{}, {}, {}], [1.0, {}, {}]), # HIGHSHELF\n", m_audio_items.coeffs[0][0],
+                    m_audio_items.coeffs[0][1], m_audio_items.coeffs[0][2], m_audio_items.coeffs[0][3], m_audio_items.coeffs[0][4], m_audio_items.coeffs[1][0], m_audio_items.coeffs[1][1],
+                    m_audio_items.coeffs[1][2], m_audio_items.coeffs[1][3], m_audio_items.coeffs[1][4], m_audio_items.coeffs[2][0], m_audio_items.coeffs[2][1], m_audio_items.coeffs[2][2],
+                    m_audio_items.coeffs[2][3], m_audio_items.coeffs[2][4]);
     AUDIO_LOG_DEBUG("m_audio_items.pre_gain {}", m_audio_items.pre_gain);
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
-void Audio::IIR_filter(int32_t* sample) {
-
-    int32_t* s32 = sample;
+void Audio::IIR_filter(int32_t* buff, size_t len) {
+    int32_t* s32;
     float    s[2];
-    s[LEFTCHANNEL] = (float)(s32[LEFTCHANNEL] * m_audio_items.pre_gain);
-    s[RIGHTCHANNEL] = (float)(s32[RIGHTCHANNEL] * m_audio_items.pre_gain);
-    dsps_biquad_sf32(s, s, 1, m_audio_items.coeffs[0], m_audio_items.state_biquad[0]);
-    dsps_biquad_sf32(s, s, 1, m_audio_items.coeffs[1], m_audio_items.state_biquad[1]);
-    dsps_biquad_sf32(s, s, 1, m_audio_items.coeffs[2], m_audio_items.state_biquad[2]);
-    s32[LEFTCHANNEL] = (int32_t)std::clamp(s[LEFTCHANNEL], -2147483648.0f, 2147483647.0f);
-    s32[RIGHTCHANNEL] = (int32_t)std::clamp(s[RIGHTCHANNEL], -2147483648.0f, 2147483647.0f);
+    for (int i = 0; i < len / 2; i++) {
+        s32 = buff + (i * 2);
+        s[LEFTCHANNEL] = (float)(s32[LEFTCHANNEL] * m_audio_items.pre_gain);
+        s[RIGHTCHANNEL] = (float)(s32[RIGHTCHANNEL] * m_audio_items.pre_gain);
+        dsps_biquad_sf32(s, s, 1, m_audio_items.coeffs[0], m_audio_items.state_biquad[0]);
+        dsps_biquad_sf32(s, s, 1, m_audio_items.coeffs[1], m_audio_items.state_biquad[1]);
+        dsps_biquad_sf32(s, s, 1, m_audio_items.coeffs[2], m_audio_items.state_biquad[2]);
+        s32[LEFTCHANNEL] = (int32_t)std::clamp(s[LEFTCHANNEL], -2147483648.0f, 2147483647.0f);
+        s32[RIGHTCHANNEL] = (int32_t)std::clamp(s[RIGHTCHANNEL], -2147483648.0f, 2147483647.0f);
+    }
     return;
 }
-
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————-
 //    AAC - T R A N S P O R T S T R E A M
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————-
@@ -8037,27 +8050,27 @@ const char* Audio::getVersion() {
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
 bool Audio::get_info() {
-    if (m_info_queue.e.size() == 0) return false;
-    msg_t i = {0};
-    while (m_info_queue.e.size()) {
-        ps_ptr<char> msg = m_info_queue.msg.back();
-        i.msg = msg.c_get();
-        i.e = (event_t)m_info_queue.e.back();
-        ps_ptr<char> evtstr = m_info_queue.s.back();
-        i.s = evtstr.c_get();
-        i.arg1 = m_info_queue.arg1.back();
-        i.arg2 = m_info_queue.arg2.back();
-        i.i2s_num = m_i2s_items.i2s_num;
-        i.vec = m_info_queue.vec.back();
 
-        m_info_queue.msg.pop_back();
-        m_info_queue.e.pop_back();
-        m_info_queue.s.pop_back();
-        m_info_queue.arg1.pop_back();
-        m_info_queue.arg2.pop_back();
-        m_info_queue.vec.pop_back();
+    std::lock_guard<std::mutex> lock(mutex_info);
+    if (m_info_queue.queue.empty()) return false;
+
+    msg_t i = {0};
+
+    const audiolib::InfoItem& item = m_info_queue.queue.front();
+
+        ps_ptr<char> msg = item.msg;
+        i.msg = msg.c_get();
+        i.e = (event_t)item.e;
+        ps_ptr<char> evtstr = item.s;
+        i.s = evtstr.c_get();
+        i.arg1 = item.arg1;
+        i.arg2 = item.arg2;
+        i.i2s_num = m_i2s_items.i2s_num;
+        i.vec = item.vec;
+
         audio_info_callback(i);
-    }
+        m_info_queue.queue.pop_front();
+
     return true;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
@@ -8298,10 +8311,10 @@ void Audio::performAudioTask() {
         return;
     } else {
         int32_t c[2] = {0};
-        calculateVUlevel(c);
+        //   calculateVUlevel(c);
         gain_ramp();
         if (SamplesBuff.bufferFilled()) { playChunk(); }
-        vTaskDelay(20);
+        vTaskDelay(50);
         return;
     }
 }
