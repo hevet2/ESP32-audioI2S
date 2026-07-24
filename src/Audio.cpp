@@ -6695,12 +6695,10 @@ int32_t Audio::audioFileSeek(uint32_t position, size_t len) {
 bool Audio::setSampleRate(uint32_t sampRate) {
 
     if (!sampRate) return false;
-    
     if (sampRate < 16000) {
         AUDIO_LOG_WARN("Sample rate must not be smaller than 16kHz, found: {}", sampRate);
         // return false;
     }
-    
     if (m_i2s_items.sampleRate != sampRate) {
         m_i2s_items.sampleRate = sampRate;
 
@@ -6710,7 +6708,6 @@ bool Audio::setSampleRate(uint32_t sampRate) {
         } else {
             m_output_sr = SR_ORIGIN; 
         }
-        // -------------------------------------------------------------------
 
         m_resampler.hasLast = false;
         reconfigI2S();
