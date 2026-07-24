@@ -6698,6 +6698,7 @@ bool Audio::setSampleRate(uint32_t sampRate) {
     
     if (sampRate < 16000) {
         AUDIO_LOG_WARN("Sample rate must not be smaller than 16kHz, found: {}", sampRate);
+        // return false;
     }
     
     if (m_i2s_items.sampleRate != sampRate) {
