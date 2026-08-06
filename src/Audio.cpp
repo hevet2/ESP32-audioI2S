@@ -4,8 +4,8 @@
 
     Created on: 28.10.2018                                                                                                  */
 char audioI2SVers[] = "\
-    Version 4.0.0-alpha1                                                                                                                           ";
-/*  Updated on: Aug 01, 2026
+    Version 4.0.0                                                                                                                          ";
+/*  Updated on: Aug 06, 2026
 
     Author: Wolle (schreibfaul1)
     Audio library for ESP32, ESP32-S3 or ESP32-P4
@@ -1297,7 +1297,7 @@ bool Audio::httpPrint(const char* host) {
     m_dataMode = HTTP_RESPONSE_HEADER; // Handle header
     m_streamType = ST_WEBSTREAM;
     m_f_chunked = false;
-    AUDIO_LOG_WARN("playlistFormat {}, dataMode {}, streamType: {}", plsFmtStr[m_playlistFormat], dataModeStr[m_dataMode], streamTypeStr[m_streamType]);
+    AUDIO_LOG_DEBUG("playlistFormat {}, dataMode {}, streamType: {}", plsFmtStr[m_playlistFormat], dataModeStr[m_dataMode], streamTypeStr[m_streamType]);
     return true;
 }
 // —————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————————
